@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>오픈비드(OpenBid) - 유형별 3대 탭 & 스마트 등록폼</title>
+  <title>오픈비드(OpenBid) - 반(半)블라인드 오퍼 시스템</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
   <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=50e6236d3a240baf3fd89b589bc40840&libraries=services"></script>
@@ -25,7 +25,7 @@
         <div class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-lg shadow-sm">O</div>
         <span class="text-xl font-black text-slate-900 tracking-tight">OPEN<span class="text-blue-600">BID</span></span>
       </div>
-      <span class="hidden md:inline-block text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold">유형별 맞춤 오픈비드</span>
+      <span class="hidden md:inline-block text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold">반블라인드 안심 입찰</span>
     </div>
 
     <!-- 모드 스위치 -->
@@ -38,8 +38,8 @@
     <div class="flex items-center space-x-3">
       <div class="flex items-center bg-slate-900 text-white p-1 rounded-xl text-xs">
         <span class="px-2 text-[11px] text-slate-300 font-medium">시점:</span>
-        <button onclick="toggleRole('visitor')" id="role-visitor" class="px-2.5 py-1 rounded-lg font-bold bg-blue-600 text-white">👁️ 방문자</button>
-        <button onclick="toggleRole('owner')" id="role-owner" class="px-2.5 py-1 rounded-lg font-medium text-slate-300">🔑 집주인</button>
+        <button onclick="toggleRole('visitor')" id="role-visitor" class="px-2.5 py-1 rounded-lg font-bold bg-blue-600 text-white">👁️ 방문자 (블라인드)</button>
+        <button onclick="toggleRole('owner')" id="role-owner" class="px-2.5 py-1 rounded-lg font-medium text-slate-300">🔑 집주인 (공개)</button>
       </div>
       <button onclick="openManagerModal()" class="bg-slate-800 text-white px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-slate-700 transition">📋 내 매물 관리</button>
       <button onclick="openRegisterModal()" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-extrabold hover:bg-blue-700 shadow-md">+ 매물 등록</button>
@@ -55,7 +55,7 @@
     </div>
 
     <div class="text-[11px] text-slate-500 font-semibold">
-      💡 <span class="text-blue-600 font-bold">파란색 핀 = 매매</span> / <span class="text-purple-600 font-bold">보라색 핀 = 전월세</span>
+      🔒 방문자에게는 오퍼 가격이 <span class="text-rose-600 font-bold">반블라인드 구간</span>으로만 표시됩니다.
     </div>
   </div>
 
@@ -160,7 +160,6 @@
         </div>
         <div><label class="font-bold block mb-1">매물 제목</label><input id="reg-title" type="text" placeholder="예: 마포래미안 34평 로얄동" class="w-full border rounded-xl p-2 font-medium"></div>
         
-        <!-- 전월세 vs 매매에 따라 다르게 보이는 입력폼 -->
         <div id="reg-price-container" class="grid grid-cols-3 gap-2">
           <div><label class="font-bold block mb-1" id="label-p1">매도가(만)</label><input id="reg-price" type="number" placeholder="150000" class="w-full border rounded-xl p-2"></div>
           <div id="reg-box-dep"><label class="font-bold block mb-1">보증금(만)</label><input id="reg-dep" type="number" placeholder="0" class="w-full border rounded-xl p-2"></div>
@@ -174,7 +173,7 @@
     </div>
   </div>
 
-  <!-- 5. 내 매물 관리(수정/삭제) 모달 -->
+  <!-- 5. 내 매물 관리 모달 -->
   <div id="manager-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50">
     <div class="bg-white rounded-2xl p-6 w-[560px] shadow-2xl border max-h-[80vh] flex flex-col">
       <div class="flex justify-between items-center border-b pb-3 mb-4">
@@ -209,7 +208,6 @@
   </div>
 
   <script>
-    // category: 'apartment', 'commercial', 'villa' / dealType: 'sale', 'lease'
     let listings = [
       { id: 'item1', mode: 'normal', category: 'apartment', dealType: 'sale', badge: '아파트 매매', location: '서울 마포구 아현동 777', title: '마포래미안푸르지오 34평 남향 매매', lat: 37.5562, lng: 126.9536, priceMan: 165000, depositMan: 0, rentMan: 0, yieldRate: 0, offers: [{ track: 'direct', priceMan: 162000, subOpt: '실거주 직거래', cond: '즉시 입주' }] },
       { id: 'item2', mode: 'normal', category: 'apartment', dealType: 'lease', badge: '아파트 전세', location: '서울 마포구 공덕동 450', title: '공덕 파크자이 로얄층 아파트 전세', lat: 37.5430, lng: 126.9510, priceMan: 90000, depositMan: 90000, rentMan: 0, yieldRate: 0, offers: [{ track: 'direct', priceMan: 90000, subOpt: '대출 가능', cond: '즉시 입주' }] },
@@ -220,8 +218,8 @@
     ];
 
     let currentMarketMode = 'normal';
-    let currentCategory = 'apartment'; // 기본 아파트 탭
-    let currentRole = 'visitor';
+    let currentCategory = 'apartment';
+    let currentRole = 'visitor'; // 기본 방문자 (반블라인드 적용)
     let selectedId = 'item1';
     let currentTrack = 'direct';
 
@@ -283,7 +281,16 @@
       return `${man.toLocaleString()}만`;
     }
 
-    // 3대 탭 전환
+    // 🔒 반(半) 블라인드 가격 포맷팅 (방문자용)
+    function formatBlindPrice(man) {
+      const eok = Math.floor(man / 10000);
+      const rest = man % 10000;
+      let range = '초반대';
+      if (rest >= 7000) range = '후반대';
+      else if (rest >= 3500) range = '중반대';
+      return `🔒 ${eok}억 ${range} 제안`;
+    }
+
     function switchCategory(cat) {
       currentCategory = cat;
       ['apartment', 'commercial', 'villa'].forEach(c => {
@@ -307,9 +314,7 @@
       });
 
       filtered.forEach(item => {
-        // 색상 구분: 매매는 파란색, 전월세는 보자주색 계열
         const pinBg = item.dealType === 'sale' ? 'bg-blue-600' : 'bg-purple-600';
-
         const content = document.createElement('div');
         content.className = `custom-pin ${pinBg} text-white px-3 py-1.5 rounded-2xl shadow-xl border-2 border-white whitespace-nowrap`;
         
@@ -356,40 +361,51 @@
       if (item.dealType === 'sale') {
         document.getElementById('box-label-1').innerText = "매도가";
         document.getElementById('box-label-2').innerText = "보증금 / 월세";
-        document.getElementById('box-label-3').innerText = "수익률 / 특징";
+        document.getElementById('box-label-3').innerText = "수익률";
         document.getElementById('stat-val-1').innerText = formatPriceMan(item.priceMan, 'sale');
-        document.getElementById('stat-val-2').innerText = item.rentMan > 0 ? `${item.depositMan.toLocaleString()}만/${item.rentMan}만` : `공실/입주협의`;
-        document.getElementById('stat-val-3').innerText = item.yieldRate > 0 ? `${item.yieldRate}%` : '실거주 매매';
+        document.getElementById('stat-val-2').innerText = item.rentMan > 0 ? `${item.depositMan.toLocaleString()}만/${item.rentMan}만` : `협의입주`;
+        document.getElementById('stat-val-3').innerText = item.yieldRate > 0 ? `${item.yieldRate}%` : '실거주';
       } else {
         document.getElementById('box-label-1').innerText = "보증금 (전세가)";
         document.getElementById('box-label-2').innerText = "월세 금액";
-        document.getElementById('box-label-3').innerText = "입주 조건";
+        document.getElementById('box-label-3').innerText = "입주조건";
         document.getElementById('stat-val-1').innerText = formatPriceMan(item.priceMan, 'lease');
         document.getElementById('stat-val-2').innerText = item.rentMan > 0 ? `${item.rentMan}만 원` : `전세 (무월세)`;
-        document.getElementById('stat-val-3').innerText = "즉시 입주가능";
+        document.getElementById('stat-val-3').innerText = "즉시입주";
       }
 
       renderOffers(item);
     }
 
+    // 🔒 방문자 시점에서는 반블라인드 적용, 집주인 시점에서는 완전 공개
     function renderOffers(item) {
       const container = document.getElementById('bid-list-container');
       document.getElementById('bid-count-badge').innerText = `총 ${item.offers.length}건 경쟁중`;
       container.innerHTML = '';
 
-      item.offers.forEach((offer) => {
+      if (item.offers.length === 0) {
+        container.innerHTML = `<div class="text-center text-slate-400 py-4 text-xs">아직 등록된 오퍼가 없습니다. 첫 오퍼를 남겨보세요!</div>`;
+        return;
+      }
+
+      item.offers.forEach((offer, idx) => {
         const isDirect = offer.track === 'direct';
+        const displayPrice = currentRole === 'owner' ? formatPriceMan(offer.priceMan, item.dealType) : formatBlindPrice(offer.priceMan);
+        const actionBtn = currentRole === 'owner' 
+          ? `<button onclick="alert('오퍼가 채택되었습니다!')" class="bg-slate-900 text-white text-xs font-bold px-3 py-1 rounded-xl">채택</button>`
+          : `<span class="text-[11px] text-slate-400 bg-white px-2 py-1 rounded border">블라인드</span>`;
+
         container.innerHTML += `
           <div class="p-3.5 rounded-2xl border ${isDirect ? 'border-blue-200 bg-blue-50/40' : 'border-purple-200 bg-purple-50/40'} flex justify-between items-center shadow-sm">
             <div>
               <div class="flex items-center space-x-1.5">
                 <span class="text-[10px] font-bold ${isDirect ? 'bg-blue-600' : 'bg-purple-600'} text-white px-2 py-0.5 rounded">${isDirect ? '직거래' : '중개사'}</span>
-                <span class="font-black text-slate-900 text-sm">${formatPriceMan(offer.priceMan, item.dealType)}</span>
+                <span class="font-black text-slate-900 text-sm">${displayPrice}</span>
                 <span class="text-[10px] text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">${offer.subOpt}</span>
               </div>
               <p class="text-xs text-slate-600 mt-1">조건: ${offer.cond}</p>
             </div>
-            ${currentRole === 'owner' ? `<button onclick="alert('채택 완료')" class="bg-slate-900 text-white text-xs font-bold px-3 py-1 rounded-xl">채택</button>` : `<span class="text-[11px] text-slate-400 bg-white px-2 py-1 rounded border">집주인 전용</span>`}
+            ${actionBtn}
           </div>
         `;
       });
@@ -397,8 +413,8 @@
 
     function toggleRole(role) {
       currentRole = role;
-      document.getElementById('role-visitor').className = role === 'visitor' ? "px-2.5 py-1 rounded-lg font-bold bg-blue-600 text-white" : "px-2.5 py-1 rounded-lg font-medium text-slate-300";
-      document.getElementById('role-owner').className = role === 'owner' ? "px-2.5 py-1 rounded-lg font-extrabold bg-amber-400 text-slate-950" : "px-2.5 py-1 rounded-lg font-medium text-slate-300";
+      document.getElementById('role-visitor').className = role === 'visitor' ? "px-2.5 py-1 rounded-lg font-bold bg-blue-600 text-white transition" : "px-2.5 py-1 rounded-lg font-medium text-slate-300 transition";
+      document.getElementById('role-owner').className = role === 'owner' ? "px-2.5 py-1 rounded-lg font-extrabold bg-amber-400 text-slate-950 transition" : "px-2.5 py-1 rounded-lg font-medium text-slate-300 transition";
       selectListing(selectedId);
     }
 
@@ -427,7 +443,6 @@
       renderMarkers();
     }
 
-    // 등록 모달 및 스마트 폼 제어
     function openRegisterModal() { document.getElementById('register-modal').classList.remove('hidden'); }
     function closeRegisterModal() { document.getElementById('register-modal').classList.add('hidden'); }
 
@@ -482,7 +497,6 @@
       });
     }
 
-    // 관리(수정/삭제) 모달
     function openManagerModal() {
       const container = document.getElementById('manager-list');
       container.innerHTML = '';
