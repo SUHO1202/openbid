@@ -9,7 +9,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- 1. 카카오 우편번호/도로명 주소 검색 공식 API (키 없이 즉시 작동) -->
   <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-  <!-- 2. 폴백용 기본 지도 엔진 (카카오맵 키 입력 전까지 작동) -->
+  <!-- 카카오맵 JavaScript SDK (지적도·로드뷰·주소 좌표변환) -->
+  <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=50e6236d3a240baf3fd89b589bc40840&libraries=services"></script>
+  <!-- 2. 폴백용 기본 지도 엔진 (카카오맵 로드 실패 시 사용) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
@@ -398,10 +400,41 @@
       }).addTo(leafletMap);
     }
 
-    // 🟡 사용자가 카카오 JavaScript 키를 입력했을 때 실제 카카오맵으로 즉시 전환!
+    function markKakaoReady() {
+      const bar = document.getElementById('kakao-setup-bar');
+      if (!bar) return;
+      bar.className = "bg-emerald-600 text-white px-5 py-2 flex justify-between items-center z-40 shadow-sm";
+      bar.innerHTML = `
+        <div class="flex items-center space-x-2 text-xs font-bold">
+          <span class="bg-white text-emerald-800 px-2 py-0.5 rounded font-black">✅ KAKAO MAP 엔진 가동중</span>
+          <span>실제 카카오맵이 연결되었습니다! 이제 지도 우측 상단의 [📐 지적도 켜기]와 [📸 로드뷰]를 100% 실제 데이터로 사용할 수 있습니다.</span>
+        </div>
+      `;
+    }
+
+    function initKakaoMap() {
+      if (!window.kakao || !kakao.maps) return false;
+      if (leafletMap) {
+        leafletMap.remove();
+        leafletMap = null;
+      }
+      const container = document.getElementById('map');
+      container.innerHTML = '';
+      kakaoMap = new kakao.maps.Map(container, {
+        center: new kakao.maps.LatLng(37.5006, 127.0364),
+        level: 5
+      });
+      mapEngine = 'kakao';
+      markKakaoReady();
+      renderMarkers();
+      return true;
+    }
+
+    // 🟡 상단 바에 다른 키를 넣었을 때 해당 키로 카카오맵을 다시 로드
     function activateKakaoMap() {
-      const apiKey = document.getElementById('kakao-key-input').value.trim();
+      const apiKey = document.getElementById('kakao-key-input')?.value.trim();
       if (!apiKey) {
+        if (initKakaoMap()) return;
         alert('발급받으신 카카오 JavaScript 키를 입력창에 붙여넣어 주세요!');
         return;
       }
@@ -410,26 +443,7 @@
       script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${apiKey}&libraries=services&autoload=false`;
       script.onload = () => {
         kakao.maps.load(() => {
-          // 기존 Leaflet 제거 후 카카오맵 초기화
-          if (leafletMap) {
-            leafletMap.remove();
-            leafletMap = null;
-          }
-          const container = document.getElementById('map');
-          container.innerHTML = '';
-          kakaoMap = new kakao.maps.Map(container, {
-            center: new kakao.maps.LatLng(37.5006, 127.0364),
-            level: 5
-          });
-          mapEngine = 'kakao';
-          document.getElementById('kakao-setup-bar').className = "bg-emerald-600 text-white px-5 py-2 flex justify-between items-center z-40 shadow-sm";
-          document.getElementById('kakao-setup-bar').innerHTML = `
-            <div class="flex items-center space-x-2 text-xs font-bold">
-              <span class="bg-white text-emerald-800 px-2 py-0.5 rounded font-black">✅ KAKAO MAP 엔진 가동중</span>
-              <span>실제 카카오맵이 연결되었습니다! 이제 지도 우측 상단의 [📐 지적도 켜기]와 [📸 로드뷰]를 100% 실제 데이터로 사용할 수 있습니다.</span>
-            </div>
-          `;
-          renderMarkers();
+          initKakaoMap();
         });
       };
       script.onerror = () => {
@@ -780,9 +794,11 @@
       renderMarkers();
     }
 
-    // 초기 실행
-    initLeaflet();
-    renderMarkers();
+    // 초기 실행: SDK가 로드되어 있으면 카카오맵, 아니면 Leaflet 폴백
+    if (!initKakaoMap()) {
+      initLeaflet();
+      renderMarkers();
+    }
     selectListing('item1');
   </script>
 </body>
