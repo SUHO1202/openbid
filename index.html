@@ -3,11 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>오픈비드(OpenBid) - 카카오맵 실전 연동 버전</title>
+  <title>오픈비드(OpenBid) - 매물 등록/수정/삭제 완벽 지원</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- 카카오 우편번호/도로명 주소 검색 공식 API -->
   <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-  <!-- 카카오맵 공식 JavaScript SDK (발급받으신 AppKey 적용 완료) -->
   <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=50e6236d3a240baf3fd89b589bc40840&libraries=services"></script>
   <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -20,34 +18,31 @@
 </head>
 <body class="bg-slate-100 h-screen flex flex-col overflow-hidden select-none">
 
-  <!-- 1. 메인 네비게이션 바 -->
+  <!-- 1. 메인 헤더 -->
   <header class="bg-white border-b border-slate-200 px-5 py-2.5 flex justify-between items-center z-30 shadow-sm">
     <div class="flex items-center space-x-3">
       <div class="flex items-center space-x-1.5">
         <div class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-lg shadow-sm">O</div>
         <span class="text-xl font-black text-slate-900 tracking-tight">OPEN<span class="text-blue-600">BID</span></span>
       </div>
-      <span class="hidden md:inline-block text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold">광고 0% · 반(半)블라인드 · 듀얼입찰</span>
+      <span class="hidden md:inline-block text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold">광고 0% · 반블라인드 · 듀얼입찰</span>
     </div>
 
-    <!-- 거래 모드 스위치 -->
+    <!-- 모드 스위치 -->
     <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
-      <button onclick="switchMarketMode('normal')" id="mode-normal" class="px-3.5 py-1.5 rounded-lg text-xs font-extrabold bg-white text-blue-600 shadow-sm transition">
-        🏢 매물 입찰 (집주인 등록)
-      </button>
-      <button onclick="switchMarketMode('reverse')" id="mode-reverse" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition">
-        🔥 역경매 (매수자 대기표)
-      </button>
+      <button onclick="switchMarketMode('normal')" id="mode-normal" class="px-3.5 py-1.5 rounded-lg text-xs font-extrabold bg-white text-blue-600 shadow-sm">🏢 매물 입찰</button>
+      <button onclick="switchMarketMode('reverse')" id="mode-reverse" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">🔥 역경매 대기표</button>
     </div>
 
-    <!-- 시점 전환 & 매물 등록 -->
+    <!-- 시점 전환 및 매물 관리 버튼 -->
     <div class="flex items-center space-x-3">
       <div class="flex items-center bg-slate-900 text-white p-1 rounded-xl text-xs">
         <span class="px-2 text-[11px] text-slate-300 font-medium">시점:</span>
-        <button onclick="toggleRole('visitor')" id="role-visitor" class="px-2.5 py-1 rounded-lg font-bold bg-blue-600 text-white transition">👁️ 일반 방문자</button>
-        <button onclick="toggleRole('owner')" id="role-owner" class="px-2.5 py-1 rounded-lg font-medium text-slate-300 hover:text-white transition">🔑 집주인 본인</button>
+        <button onclick="toggleRole('visitor')" id="role-visitor" class="px-2.5 py-1 rounded-lg font-bold bg-blue-600 text-white">👁️ 방문자</button>
+        <button onclick="toggleRole('owner')" id="role-owner" class="px-2.5 py-1 rounded-lg font-medium text-slate-300">🔑 집주인</button>
       </div>
-      <button onclick="openRegisterModal()" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-extrabold hover:bg-blue-700 shadow-md transition active:scale-95">+ 매물 등록</button>
+      <button onclick="openManagerModal()" class="bg-slate-800 text-white px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-slate-700 transition">📋 내 매물 관리</button>
+      <button onclick="openRegisterModal()" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-extrabold hover:bg-blue-700 shadow-md">+ 매물 등록</button>
     </div>
   </header>
 
@@ -56,75 +51,47 @@
     <div class="flex items-center space-x-1.5">
       <span class="text-slate-400 font-bold mr-1">카테고리:</span>
       <button onclick="filterCategory('all')" id="cat-all" class="px-3 py-1 rounded-full font-bold bg-slate-900 text-white">전체</button>
-      <button onclick="filterCategory('commercial')" id="cat-commercial" class="px-3 py-1 rounded-full font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">수익형 상가</button>
-      <button onclick="filterCategory('apartment')" id="cat-apartment" class="px-3 py-1 rounded-full font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">아파트</button>
-    </div>
-    <div class="flex items-center space-x-2 text-slate-600">
-      <span class="font-bold text-slate-400">정렬:</span>
-      <select onchange="sortProperties(this.value)" class="border border-slate-300 rounded-lg px-2.5 py-1 font-bold text-slate-800 bg-white outline-none">
-        <option value="bids">입찰/제안 뜨거운 순</option>
-        <option value="yield">연 수익률 높은 순</option>
-      </select>
+      <button onclick="filterCategory('commercial')" id="cat-commercial" class="px-3 py-1 rounded-full font-semibold bg-slate-100 text-slate-600">수익형 상가</button>
+      <button onclick="filterCategory('apartment')" id="cat-apartment" class="px-3 py-1 rounded-full font-semibold bg-slate-100 text-slate-600">아파트</button>
     </div>
   </div>
 
   <!-- 3. 메인 워크스페이스 -->
   <div class="flex-1 flex overflow-hidden relative">
-    
-    <!-- 좌측: 카카오 지도 영역 -->
     <div class="w-7/12 h-full relative border-r border-slate-300 z-10">
       <div id="map" class="w-full h-full"></div>
-
+      
       <!-- 로드뷰 오버레이 -->
       <div id="roadview-Wrap" class="hidden absolute inset-0 bg-slate-900 z-[500] flex flex-col">
         <div class="bg-slate-900 text-white px-4 py-2.5 flex justify-between items-center">
-          <span id="rv-title" class="text-sm font-bold">상가 1층 외관 로드뷰</span>
+          <span id="rv-title" class="text-sm font-bold">로드뷰</span>
           <button onclick="closeRoadview()" class="bg-rose-600 text-white px-3 py-1 rounded-lg text-xs font-bold">✕ 닫기</button>
         </div>
         <div id="roadview" class="flex-1 w-full"></div>
       </div>
 
-      <!-- 지도 컨트롤 버튼 (지적도 / 로드뷰) -->
+      <!-- 지도 컨트롤 -->
       <div class="absolute top-3 right-3 z-[400] flex flex-col space-y-2">
-        <button onclick="toggleCadastral()" id="btn-cadastral" class="bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-lg border border-slate-300 text-xs font-black text-slate-800 hover:bg-amber-50 transition">
-          📐 지적도 켜기
-        </button>
-        <button onclick="openRoadview()" class="bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-lg border border-slate-300 text-xs font-black text-slate-800 hover:bg-amber-50 transition">
-          📸 1층 로드뷰 보기
-        </button>
+        <button onclick="toggleCadastral()" id="btn-cadastral" class="bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-lg border text-xs font-black text-slate-800 hover:bg-amber-50">📐 지적도 켜기</button>
+        <button onclick="openRoadview()" class="bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-lg border text-xs font-black text-slate-800 hover:bg-amber-50">📸 1층 로드뷰 보기</button>
       </div>
     </div>
 
-    <!-- 우측: 상세 정보 및 입찰창 -->
+    <!-- 우측 패널 -->
     <div class="w-5/12 bg-white flex flex-col h-full overflow-hidden z-10">
       <div class="flex-1 overflow-y-auto p-6">
         <div class="border-b border-slate-100 pb-4 mb-4">
           <div class="flex items-center justify-between">
             <span id="detail-badge" class="bg-blue-100 text-blue-800 text-xs font-extrabold px-2.5 py-1 rounded-md">수익형 상가</span>
-            <span id="detail-Location" class="text-xs font-bold text-slate-500">서울 강남구 역삼동</span>
+            <span id="detail-Location" class="text-xs font-bold text-slate-500">주소</span>
           </div>
-          <h2 id="detail-title" class="text-xl font-black mt-2 text-slate-900 leading-snug">강남구 역삼동 1층 상가</h2>
-          <p class="text-xs text-slate-500 mt-1">집값 담합 및 허위 매물 방지를 위한 반(半) 블라인드 오퍼 시스템 적용</p>
+          <h2 id="detail-title" class="text-xl font-black mt-2 text-slate-900">제목</h2>
         </div>
 
         <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-5 grid grid-cols-3 gap-2 text-center shadow-sm">
-          <div>
-            <div class="text-[11px] text-slate-400 font-bold">매도 희망가</div>
-            <div id="stat-val-1" class="text-base font-black text-slate-900 mt-0.5">-</div>
-          </div>
-          <div class="border-l border-r border-slate-200 px-1">
-            <div class="text-[11px] text-slate-400 font-bold">보증금 / 월세</div>
-            <div id="stat-val-2" class="text-sm font-extrabold text-slate-800 mt-1">-</div>
-          </div>
-          <div>
-            <div class="text-[11px] text-slate-400 font-bold">연 수익률</div>
-            <div id="stat-val-3" class="text-base font-black text-blue-600 mt-0.5">-</div>
-          </div>
-        </div>
-
-        <div id="role-explain-banner" class="mb-4 p-3 rounded-xl bg-slate-900 text-white text-xs flex justify-between items-center">
-          <div><span class="font-extrabold text-amber-400">👁️ 방문자 시점:</span> 입찰가는 구간으로만 보호됩니다.</div>
-          <button onclick="toggleRole('owner')" class="bg-amber-400 text-slate-950 font-black px-2.5 py-1 rounded-lg text-[11px]">집주인 모드</button>
+          <div><div class="text-[11px] text-slate-400 font-bold">매도 희망가</div><div id="stat-val-1" class="text-base font-black text-slate-900 mt-0.5">-</div></div>
+          <div class="border-l border-r border-slate-200 px-1"><div class="text-[11px] text-slate-400 font-bold">보증금 / 월세</div><div id="stat-val-2" class="text-sm font-extrabold text-slate-800 mt-1">-</div></div>
+          <div><div class="text-[11px] text-slate-400 font-bold">연 수익률</div><div id="stat-val-3" class="text-base font-black text-blue-600 mt-0.5">-</div></div>
         </div>
 
         <div class="flex justify-between items-center mb-3">
@@ -135,15 +102,15 @@
         <div id="bid-list-container" class="space-y-2.5 mb-4"></div>
       </div>
 
-      <!-- 하단 입력창 -->
+      <!-- 하단 오퍼 입력 -->
       <div class="bg-slate-50 p-4 border-t border-slate-200">
         <div class="flex space-x-1.5 mb-2 text-xs">
-          <button onclick="selectTrack('direct')" id="track-btn-direct" class="flex-1 py-1.5 rounded-lg font-extrabold bg-white text-blue-600 border shadow-sm">트랙A: 직거래 (복비 0원)</button>
-          <button onclick="selectTrack('agent')" id="track-btn-agent" class="flex-1 py-1.5 rounded-lg font-bold text-slate-600 border">트랙B: 공인중개사 (수수료할인)</button>
+          <button onclick="selectTrack('direct')" id="track-btn-direct" class="flex-1 py-1.5 rounded-lg font-extrabold bg-white text-blue-600 border shadow-sm">트랙A: 직거래</button>
+          <button onclick="selectTrack('agent')" id="track-btn-agent" class="flex-1 py-1.5 rounded-lg font-bold text-slate-600 border">트랙B: 중개사</button>
         </div>
         <div class="flex space-x-2 mb-2">
-          <input id="input-price" type="number" placeholder="제안 금액 (만원, 예: 98000)" class="w-full border rounded-xl px-3 py-2 text-xs font-bold bg-white outline-none">
-          <select id="input-sub-option" class="border rounded-xl px-2 py-2 text-xs font-bold bg-white text-slate-700 outline-none">
+          <input id="input-price" type="number" placeholder="제안 금액 (만원)" class="w-full border rounded-xl px-3 py-2 text-xs font-bold bg-white outline-none">
+          <select id="input-sub-option" class="border rounded-xl px-2 py-2 text-xs font-bold bg-white outline-none">
             <option value="현금 잔금 1개월 내">현금 잔금 1개월 내</option>
             <option value="포괄양수도 승계">포괄양수도 승계</option>
           </select>
@@ -160,21 +127,18 @@
   <div id="register-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50">
     <div class="bg-white rounded-2xl p-6 w-[480px] shadow-2xl border">
       <div class="flex justify-between items-center border-b pb-3 mb-4">
-        <h3 class="text-base font-black text-slate-900">📍 실제 주소로 매물 등록</h3>
+        <h3 class="text-base font-black text-slate-900">📍 새 매물 등록하기</h3>
         <button onclick="closeRegisterModal()" class="text-slate-400 font-bold text-lg">✕</button>
       </div>
       <div class="space-y-3 text-xs">
         <div>
-          <label class="font-bold text-slate-700 block mb-1">도로명 주소 검색 (카카오 공식 API)</label>
+          <label class="font-bold text-slate-700 block mb-1">도로명 주소 검색</label>
           <div class="flex space-x-2">
-            <input id="reg-address" type="text" readonly placeholder="우측 버튼을 눌러 주소를 검색하세요" class="flex-1 border rounded-xl p-2 bg-slate-50 font-bold">
-            <button onclick="execKakaoPostcode()" class="bg-amber-400 text-slate-950 font-black px-3 py-2 rounded-xl shadow-sm">주소검색</button>
+            <input id="reg-address" type="text" readonly placeholder="우측 버튼 클릭" class="flex-1 border rounded-xl p-2 bg-slate-50 font-bold">
+            <button onclick="execKakaoPostcode()" class="bg-amber-400 text-slate-950 font-black px-3 py-2 rounded-xl">주소검색</button>
           </div>
         </div>
-        <div>
-          <label class="font-bold text-slate-700 block mb-1">매물 제목</label>
-          <input id="reg-title" type="text" placeholder="예: 역삼동 1층 코너 상가" class="w-full border rounded-xl p-2 font-medium">
-        </div>
+        <div><label class="font-bold block mb-1">매물 제목</label><input id="reg-title" type="text" placeholder="예: 역삼동 1층 상가" class="w-full border rounded-xl p-2 font-medium"></div>
         <div class="grid grid-cols-3 gap-2">
           <div><label class="font-bold block mb-1">희망가(만원)</label><input id="reg-price" type="number" placeholder="100000" class="w-full border rounded-xl p-2"></div>
           <div><label class="font-bold block mb-1">보증금(만원)</label><input id="reg-dep" type="number" placeholder="5000" class="w-full border rounded-xl p-2"></div>
@@ -188,10 +152,44 @@
     </div>
   </div>
 
+  <!-- 5. 내 매물 관리(수정/삭제) 모달 -->
+  <div id="manager-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-6 w-[560px] shadow-2xl border max-h-[80vh] flex flex-col">
+      <div class="flex justify-between items-center border-b pb-3 mb-4">
+        <h3 class="text-base font-black text-slate-900">📋 내가 등록한 매물 관리 (수정 및 삭제)</h3>
+        <button onclick="closeManagerModal()" class="text-slate-400 font-bold text-lg">✕</button>
+      </div>
+      <div id="manager-list" class="flex-1 overflow-y-auto space-y-3 pr-1 text-xs"></div>
+    </div>
+  </div>
+
+  <!-- 6. 매물 수정 모달 -->
+  <div id="edit-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-6 w-[480px] shadow-2xl border">
+      <div class="flex justify-between items-center border-b pb-3 mb-4">
+        <h3 class="text-base font-black text-slate-900">✏️ 매물 정보 수정하기</h3>
+        <button onclick="closeEditModal()" class="text-slate-400 font-bold text-lg">✕</button>
+      </div>
+      <input type="hidden" id="edit-id">
+      <div class="space-y-3 text-xs">
+        <div><label class="font-bold block mb-1">매물 제목</label><input id="edit-title" type="text" class="w-full border rounded-xl p-2 font-medium"></div>
+        <div class="grid grid-cols-3 gap-2">
+          <div><label class="font-bold block mb-1">희망가(만원)</label><input id="edit-price" type="number" class="w-full border rounded-xl p-2"></div>
+          <div><label class="font-bold block mb-1">보증금(만원)</label><input id="edit-dep" type="number" class="w-full border rounded-xl p-2"></div>
+          <div><label class="font-bold block mb-1">월세(만원)</label><input id="edit-rent" type="number" class="w-full border rounded-xl p-2"></div>
+        </div>
+      </div>
+      <div class="mt-5 flex space-x-2">
+        <button onclick="closeEditModal()" class="flex-1 py-2 rounded-xl border text-slate-600 font-bold">취소</button>
+        <button onclick="saveEditedListing()" class="flex-1 py-2 rounded-xl bg-blue-600 text-white font-extrabold">수정 완료</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let listings = [
-      { id: 'item1', mode: 'normal', category: 'commercial', badge: '수익형 상가', location: '서울 강남구 역삼동 152', title: '강남구 역삼동 초역세권 1층 수익형 상가', lat: 37.5006, lng: 127.0364, priceMan: 100000, depositMan: 5000, rentMan: 400, yieldRate: 5.05, offers: [{ track: 'agent', priceMan: 99500, subOpt: '중개보수 0.3%', cond: '프랜차이즈 직영점 입점 대기' }, { track: 'direct', priceMan: 97500, subOpt: '현금 잔금 1개월', cond: '법무사 안전 패키지 희망' }] },
-      { id: 'item2', mode: 'normal', category: 'apartment', badge: '아파트', location: '서울 마포구 아현동 777', title: '마포래미안푸르지오 34평 남향', lat: 37.5562, lng: 126.9536, priceMan: 165000, depositMan: 80000, rentMan: 0, yieldRate: 0, offers: [{ track: 'direct', priceMan: 162000, subOpt: '실거주 직거래', cond: '즉시 입주 가능' }] }
+      { id: 'item1', mode: 'normal', category: 'commercial', badge: '수익형 상가', location: '서울 강남구 역삼동 152', title: '강남구 역삼동 초역세권 1층 수익형 상가', lat: 37.5006, lng: 127.0364, priceMan: 100000, depositMan: 5000, rentMan: 400, yieldRate: 5.05, offers: [{ track: 'agent', priceMan: 99500, subOpt: '중개보수 0.3%', cond: '프랜차이즈 대기' }] },
+      { id: 'item2', mode: 'normal', category: 'apartment', badge: '아파트', location: '서울 마포구 아현동 777', title: '마포래미안푸르지오 34평 남향', lat: 37.5562, lng: 126.9536, priceMan: 165000, depositMan: 80000, rentMan: 0, yieldRate: 0, offers: [{ track: 'direct', priceMan: 162000, subOpt: '실거주 직거래', cond: '즉시 입주' }] }
     ];
 
     let currentMarketMode = 'normal';
@@ -204,32 +202,26 @@
     let kakaoMarkers = [];
     let isCadastralOn = false;
 
-    // 카카오맵 초기화
     function initKakaoMap() {
-      const container = document.getElementById('map');
-      kakaoMap = new kakao.maps.Map(container, {
+      kakaoMap = new kakao.maps.Map(document.getElementById('map'), {
         center: new kakao.maps.LatLng(37.5006, 127.0364),
         level: 5
       });
       renderMarkers();
     }
 
-    // 지적도 토글
     function toggleCadastral() {
       isCadastralOn = !isCadastralOn;
       const btn = document.getElementById('btn-cadastral');
       if (isCadastralOn) {
         kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
-        btn.className = "bg-amber-400 text-slate-950 px-3.5 py-2 rounded-xl shadow-lg border border-amber-600 text-xs font-black transition";
         btn.innerText = "📐 지적도 켜짐 ✓";
       } else {
         kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
-        btn.className = "bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-lg border border-slate-300 text-xs font-black text-slate-800 hover:bg-amber-50 transition";
         btn.innerText = "📐 지적도 켜기";
       }
     }
 
-    // 로드뷰 열기
     function openRoadview() {
       const item = listings.find(x => x.id === selectedId);
       if (!item) return;
@@ -245,7 +237,6 @@
     }
     function closeRoadview() { document.getElementById('roadview-Wrap').classList.add('hidden'); }
 
-    // 주소 검색
     function execKakaoPostcode() {
       new daum.Postcode({
         oncomplete: function(data) {
@@ -264,12 +255,7 @@
       if (eok > 0) return `${eok}억`;
       return `${man.toLocaleString()}만`;
     }
-    function formatBlindPrice(man) {
-      const eok = Math.floor(man / 10000);
-      return `🔒 ${eok}억 초/중반대 제안`;
-    }
 
-    // 마커 렌더링
     function renderMarkers() {
       if (!kakaoMap) return;
       kakaoMarkers.forEach(m => m.setMap(null));
@@ -331,20 +317,17 @@
 
       item.offers.forEach((offer) => {
         const isDirect = offer.track === 'direct';
-        const priceLabel = currentRole === 'owner' ? formatPriceMan(offer.priceMan) : formatBlindPrice(offer.priceMan);
-        const actionHtml = currentRole === 'owner' ? `<button onclick="alert('채택 완료')" class="bg-slate-900 text-white text-xs font-bold px-3 py-1 rounded-xl">채택</button>` : `<span class="text-[11px] text-slate-400 bg-white px-2 py-1 rounded border">집주인 전용</span>`;
-
         container.innerHTML += `
           <div class="p-3.5 rounded-2xl border ${isDirect ? 'border-blue-200 bg-blue-50/40' : 'border-purple-200 bg-purple-50/40'} flex justify-between items-center shadow-sm">
             <div>
               <div class="flex items-center space-x-1.5">
                 <span class="text-[10px] font-bold ${isDirect ? 'bg-blue-600' : 'bg-purple-600'} text-white px-2 py-0.5 rounded">${isDirect ? '직거래' : '중개사'}</span>
-                <span class="font-black text-slate-900 text-sm">${priceLabel}</span>
+                <span class="font-black text-slate-900 text-sm">${formatPriceMan(offer.priceMan)}</span>
                 <span class="text-[10px] text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">${offer.subOpt}</span>
               </div>
               <p class="text-xs text-slate-600 mt-1">조건: ${offer.cond}</p>
             </div>
-            ${actionHtml}
+            ${currentRole === 'owner' ? `<button onclick="alert('채택 완료')" class="bg-slate-900 text-white text-xs font-bold px-3 py-1 rounded-xl">채택</button>` : `<span class="text-[11px] text-slate-400 bg-white px-2 py-1 rounded border">집주인 전용</span>`}
           </div>
         `;
       });
@@ -390,6 +373,7 @@
       renderMarkers();
     }
 
+    // 등록 모달
     function openRegisterModal() { document.getElementById('register-modal').classList.remove('hidden'); }
     function closeRegisterModal() { document.getElementById('register-modal').classList.add('hidden'); }
 
@@ -417,13 +401,73 @@
       });
     }
 
-    function sortProperties(criterion) {
-      if (criterion === 'yield') listings.sort((a, b) => b.yieldRate - a.yieldRate);
-      else listings.sort((a, b) => b.offers.length - a.offers.length);
+    // 관리(수정/삭제) 모달
+    function openManagerModal() {
+      const container = document.getElementById('manager-list');
+      container.innerHTML = '';
+      if (listings.length === 0) {
+        container.innerHTML = `<div class="text-center text-slate-400 py-6">등록된 매물이 없습니다.</div>`;
+      } else {
+        listings.forEach(item => {
+          container.innerHTML += `
+            <div class="p-3 rounded-xl border border-slate-200 bg-slate-50 flex justify-between items-center">
+              <div>
+                <div class="font-extrabold text-slate-900">${item.title}</div>
+                <div class="text-[11px] text-slate-500">${item.location} | 희망가: ${formatPriceMan(item.priceMan)}</div>
+              </div>
+              <div class="flex space-x-1.5">
+                <button onclick="openEditModal('${item.id}')" class="bg-blue-100 text-blue-700 font-bold px-2.5 py-1 rounded-lg">수정</button>
+                <button onclick="deleteListing('${item.id}')" class="bg-rose-100 text-rose-700 font-bold px-2.5 py-1 rounded-lg">삭제</button>
+              </div>
+            </div>
+          `;
+        });
+      }
+      document.getElementById('manager-modal').classList.remove('hidden');
+    }
+    function closeManagerModal() { document.getElementById('manager-modal').classList.add('hidden'); }
+
+    // 삭제 기능
+    function deleteListing(id) {
+      if (!confirm('정말 이 매물을 삭제하시겠습니까?')) return;
+      listings = listings.filter(x => x.id !== id);
       renderMarkers();
+      openManagerModal();
     }
 
-    // 카카오맵 SDK 로드 후 실행
+    // 수정 모달 열기
+    function openEditModal(id) {
+      const item = listings.find(x => x.id === id);
+      if (!item) return;
+      document.getElementById('edit-id').value = item.id;
+      document.getElementById('edit-title').value = item.title;
+      document.getElementById('edit-price').value = item.priceMan;
+      document.getElementById('edit-dep').value = item.depositMan;
+      document.getElementById('edit-rent').value = item.rentMan;
+      document.getElementById('edit-modal').classList.remove('hidden');
+    }
+    function closeEditModal() { document.getElementById('edit-modal').classList.add('hidden'); }
+
+    // 수정 저장
+    function saveEditedListing() {
+      const id = document.getElementById('edit-id').value;
+      const item = listings.find(x => x.id === id);
+      if (!item) return;
+
+      item.title = document.getElementById('edit-title').value;
+      item.priceMan = parseInt(document.getElementById('edit-price').value, 10) || item.priceMan;
+      item.depositMan = parseInt(document.getElementById('edit-dep').value, 10) || item.depositMan;
+      item.rentMan = parseInt(document.include ? 0 : document.getElementById('edit-rent').value, 10);
+      if (item.rentMan > 0) {
+        item.yieldRate = parseFloat((((item.rentMan * 12) / (item.priceMan - item.depositMan)) * 100).toFixed(2));
+      }
+
+      closeEditModal();
+      openManagerModal();
+      renderMarkers();
+      selectListing(id);
+    }
+
     kakao.maps.load(function() {
       initKakaoMap();
     });
