@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>오픈비드(OpenBid) - 매매 / 전월세 탭 및 색상 구분 버전</title>
+  <title>오픈비드(OpenBid) - 유형별 3대 탭 & 스마트 등록폼</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
   <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=50e6236d3a240baf3fd89b589bc40840&libraries=services"></script>
@@ -25,12 +25,12 @@
         <div class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-lg shadow-sm">O</div>
         <span class="text-xl font-black text-slate-900 tracking-tight">OPEN<span class="text-blue-600">BID</span></span>
       </div>
-      <span class="hidden md:inline-block text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold">매매·전월세 분리 오픈비드</span>
+      <span class="hidden md:inline-block text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold">유형별 맞춤 오픈비드</span>
     </div>
 
-    <!-- 거래 모드 스위치 -->
+    <!-- 모드 스위치 -->
     <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
-      <button onclick="switchMarketMode('normal')" id="mode-normal" class="px-3.5 py-1.5 rounded-lg text-xs font-extrabold bg-white text-blue-600 shadow-sm">🏢 일반 매물 등록</button>
+      <button onclick="switchMarketMode('normal')" id="mode-normal" class="px-3.5 py-1.5 rounded-lg text-xs font-extrabold bg-white text-blue-600 shadow-sm">🏢 일반 매물</button>
       <button onclick="switchMarketMode('reverse')" id="mode-reverse" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">🔥 역경매 대기표</button>
     </div>
 
@@ -46,20 +46,16 @@
     </div>
   </header>
 
-  <!-- 2. 매매 / 전월세 대분류 및 상세 카테고리 탭 바 -->
+  <!-- 2. 상단 3대 카테고리 탭 바 -->
   <div class="bg-white border-b border-slate-200 px-5 py-2 flex flex-wrap justify-between items-center z-20 text-xs gap-2">
-    <!-- 매매 vs 전월세 메인 탭 -->
     <div class="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl">
-      <button onclick="switchDealType('sale')" id="deal-sale" class="px-4 py-1.5 rounded-lg font-extrabold bg-blue-600 text-white shadow-sm transition">🔵 매매 거래관</button>
-      <button onclick="switchDealType('lease')" id="deal-lease" class="px-4 py-1.5 rounded-lg font-bold text-slate-600 hover:text-slate-900 transition">🟣 전월세 거래관</button>
+      <button onclick="switchCategory('apartment')" id="tab-apartment" class="px-4 py-1.5 rounded-lg font-extrabold bg-blue-600 text-white shadow-sm transition">🏢 아파트 / 오피스텔</button>
+      <button onclick="switchCategory('commercial')" id="tab-commercial" class="px-4 py-1.5 rounded-lg font-bold text-slate-600 hover:text-slate-900 transition">🏪 수익형 상가</button>
+      <button onclick="switchCategory('villa')" id="tab-villa" class="px-4 py-1.5 rounded-lg font-bold text-slate-600 hover:text-slate-900 transition">🏡 다세대·단독·다가구</button>
     </div>
 
-    <!-- 하위 유형 필터 -->
-    <div class="flex items-center space-x-1.5" id="sub-filter-container">
-      <button onclick="filterCategory('all')" id="cat-all" class="px-3 py-1 rounded-full font-bold bg-slate-900 text-white">전체</button>
-      <button onclick="filterCategory('commercial')" id="cat-commercial" class="px-3 py-1 rounded-full font-semibold bg-slate-100 text-slate-600">수익형 상가</button>
-      <button onclick="filterCategory('apartment')" id="cat-apartment" class="px-3 py-1 rounded-full font-semibold bg-slate-100 text-slate-600">아파트</button>
-      <button onclick="filterCategory('villa')" id="cat-villa" class="px-3 py-1 rounded-full font-semibold bg-slate-100 text-slate-600">빌라/주택</button>
+    <div class="text-[11px] text-slate-500 font-semibold">
+      💡 <span class="text-blue-600 font-bold">파란색 핀 = 매매</span> / <span class="text-purple-600 font-bold">보라색 핀 = 전월세</span>
     </div>
   </div>
 
@@ -80,7 +76,7 @@
       <!-- 지도 컨트롤 -->
       <div class="absolute top-3 right-3 z-[400] flex flex-col space-y-2">
         <button onclick="toggleCadastral()" id="btn-cadastral" class="bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-lg border text-xs font-black text-slate-800 hover:bg-amber-50">📐 지적도 켜기</button>
-        <button onclick="openRoadview()" class="bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-lg border text-xs font-black text-slate-800 hover:bg-amber-50">📸 1층 로드뷰 보기</button>
+        <button onclick="openRoadview()" class="bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-lg border text-xs font-black text-slate-800 hover:bg-amber-50">📸 로드뷰 보기</button>
       </div>
     </div>
 
@@ -89,16 +85,16 @@
       <div class="flex-1 overflow-y-auto p-6">
         <div class="border-b border-slate-100 pb-4 mb-4">
           <div class="flex items-center justify-between">
-            <span id="detail-badge" class="bg-blue-100 text-blue-800 text-xs font-extrabold px-2.5 py-1 rounded-md">매매</span>
+            <span id="detail-badge" class="bg-blue-100 text-blue-800 text-xs font-extrabold px-2.5 py-1 rounded-md">아파트 매매</span>
             <span id="detail-Location" class="text-xs font-bold text-slate-500">주소</span>
           </div>
           <h2 id="detail-title" class="text-xl font-black mt-2 text-slate-900">제목</h2>
         </div>
 
         <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-5 grid grid-cols-3 gap-2 text-center shadow-sm">
-          <div><div id="box-label-1" class="text-[11px] text-slate-400 font-bold">매도 희망가</div><div id="stat-val-1" class="text-base font-black text-slate-900 mt-0.5">-</div></div>
+          <div><div id="box-label-1" class="text-[11px] text-slate-400 font-bold">매도가</div><div id="stat-val-1" class="text-base font-black text-slate-900 mt-0.5">-</div></div>
           <div class="border-l border-r border-slate-200 px-1"><div id="box-label-2" class="text-[11px] text-slate-400 font-bold">보증금 / 월세</div><div id="stat-val-2" class="text-sm font-extrabold text-slate-800 mt-1">-</div></div>
-          <div><div id="box-label-3" class="text-[11px] text-slate-400 font-bold">연 수익률 / 조건</div><div id="stat-val-3" class="text-base font-black text-blue-600 mt-0.5">-</div></div>
+          <div><div id="box-label-3" class="text-[11px] text-slate-400 font-bold">특징 / 수익률</div><div id="stat-val-3" class="text-base font-black text-blue-600 mt-0.5">-</div></div>
         </div>
 
         <div class="flex justify-between items-center mb-3">
@@ -116,7 +112,7 @@
           <button onclick="selectTrack('agent')" id="track-btn-agent" class="flex-1 py-1.5 rounded-lg font-bold text-slate-600 border">트랙B: 중개사</button>
         </div>
         <div class="flex space-x-2 mb-2">
-          <input id="input-price" type="number" placeholder="제안 금액/보증금 (만원)" class="w-full border rounded-xl px-3 py-2 text-xs font-bold bg-white outline-none">
+          <input id="input-price" type="number" placeholder="제안 금액 (만원)" class="w-full border rounded-xl px-3 py-2 text-xs font-bold bg-white outline-none">
           <select id="input-sub-option" class="border rounded-xl px-2 py-2 text-xs font-bold bg-white outline-none">
             <option value="조건 협의 가능">조건 협의 가능</option>
             <option value="즉시 계약 희망">즉시 계약 희망</option>
@@ -130,7 +126,7 @@
     </div>
   </div>
 
-  <!-- 4. 매물 등록 모달 -->
+  <!-- 4. 스마트 매물 등록 모달 -->
   <div id="register-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50">
     <div class="bg-white rounded-2xl p-6 w-[480px] shadow-2xl border">
       <div class="flex justify-between items-center border-b pb-3 mb-4">
@@ -140,18 +136,18 @@
       <div class="space-y-3 text-xs">
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="font-bold block mb-1">거래 유형</label>
-            <select id="reg-dealType" class="w-full border rounded-xl p-2 font-bold bg-slate-50">
-              <option value="sale">매매</option>
-              <option value="lease">전월세</option>
+            <label class="font-bold block mb-1">부동산 유형</label>
+            <select id="reg-cat" class="w-full border rounded-xl p-2 font-bold bg-slate-50">
+              <option value="apartment">아파트 / 오피스텔</option>
+              <option value="commercial">수익형 상가</option>
+              <option value="villa">다세대·단독·다가구</option>
             </select>
           </div>
           <div>
-            <label class="font-bold block mb-1">카테고리</label>
-            <select id="reg-cat" class="w-full border rounded-xl p-2 font-bold bg-slate-50">
-              <option value="commercial">수익형 상가</option>
-              <option value="apartment">아파트</option>
-              <option value="villa">빌라/주택</option>
+            <label class="font-bold block mb-1">거래 방식</label>
+            <select id="reg-dealType" onchange="onRegDealTypeChange()" class="w-full border rounded-xl p-2 font-bold bg-slate-50">
+              <option value="sale">매매</option>
+              <option value="lease">전월세</option>
             </select>
           </div>
         </div>
@@ -162,11 +158,13 @@
             <button onclick="execKakaoPostcode()" class="bg-amber-400 text-slate-950 font-black px-3 py-2 rounded-xl">주소검색</button>
           </div>
         </div>
-        <div><label class="font-bold block mb-1">매물 제목</label><input id="reg-title" type="text" placeholder="예: 역삼동 1층 상가" class="w-full border rounded-xl p-2 font-medium"></div>
-        <div class="grid grid-cols-3 gap-2">
-          <div><label class="font-bold block mb-1" id="label-price">매도가(만)</label><input id="reg-price" type="number" placeholder="100000" class="w-full border rounded-xl p-2"></div>
-          <div><label class="font-bold block mb-1">보증금(만)</label><input id="reg-dep" type="number" placeholder="5000" class="w-full border rounded-xl p-2"></div>
-          <div><label class="font-bold block mb-1">월세(만)</label><input id="reg-rent" type="number" placeholder="400" class="w-full border rounded-xl p-2"></div>
+        <div><label class="font-bold block mb-1">매물 제목</label><input id="reg-title" type="text" placeholder="예: 마포래미안 34평 로얄동" class="w-full border rounded-xl p-2 font-medium"></div>
+        
+        <!-- 전월세 vs 매매에 따라 다르게 보이는 입력폼 -->
+        <div id="reg-price-container" class="grid grid-cols-3 gap-2">
+          <div><label class="font-bold block mb-1" id="label-p1">매도가(만)</label><input id="reg-price" type="number" placeholder="150000" class="w-full border rounded-xl p-2"></div>
+          <div id="reg-box-dep"><label class="font-bold block mb-1">보증금(만)</label><input id="reg-dep" type="number" placeholder="0" class="w-full border rounded-xl p-2"></div>
+          <div id="reg-box-rent"><label class="font-bold block mb-1">월세(만)</label><input id="reg-rent" type="number" placeholder="0" class="w-full border rounded-xl p-2"></div>
         </div>
       </div>
       <div class="mt-5 flex space-x-2">
@@ -198,7 +196,7 @@
       <div class="space-y-3 text-xs">
         <div><label class="font-bold block mb-1">매물 제목</label><input id="edit-title" type="text" class="w-full border rounded-xl p-2 font-medium"></div>
         <div class="grid grid-cols-3 gap-2">
-          <div><label class="font-bold block mb-1">가격/보증금(만)</label><input id="edit-price" type="number" class="w-full border rounded-xl p-2"></div>
+          <div><label class="font-bold block mb-1">매도가/보증금(만)</label><input id="edit-price" type="number" class="w-full border rounded-xl p-2"></div>
           <div><label class="font-bold block mb-1">보증금(만)</label><input id="edit-dep" type="number" class="w-full border rounded-xl p-2"></div>
           <div><label class="font-bold block mb-1">월세(만)</label><input id="edit-rent" type="number" class="w-full border rounded-xl p-2"></div>
         </div>
@@ -211,18 +209,19 @@
   </div>
 
   <script>
-    // dealType: 'sale'(매매) 또는 'lease'(전월세)
+    // category: 'apartment', 'commercial', 'villa' / dealType: 'sale', 'lease'
     let listings = [
-      { id: 'item1', mode: 'normal', dealType: 'sale', category: 'commercial', badge: '상가 매매', location: '서울 강남구 역삼동 152', title: '강남구 역삼동 초역세권 1층 수익형 상가 매매', lat: 37.5006, lng: 127.0364, priceMan: 100000, depositMan: 5000, rentMan: 400, yieldRate: 5.05, offers: [{ track: 'agent', priceMan: 99500, subOpt: '중개보수 0.3%', cond: '프랜차이즈 대기' }] },
-      { id: 'item2', mode: 'normal', dealType: 'sale', category: 'apartment', badge: '아파트 매매', location: '서울 마포구 아현동 777', title: '마포래미안푸르지오 34평 남향 매매', lat: 37.5562, lng: 126.9536, priceMan: 165000, depositMan: 0, rentMan: 0, yieldRate: 0, offers: [{ track: 'direct', priceMan: 162000, subOpt: '실거주 직거래', cond: '즉시 입주' }] },
-      { id: 'item3', mode: 'normal', dealType: 'lease', category: 'commercial', badge: '상가 월세', location: '서울 강남구 테헤란로 100', title: '역삼역 직후방 1층 코너 상가 월세', lat: 37.5015, lng: 127.0380, priceMan: 10000, depositMan: 5000, rentMan: 350, yieldRate: 0, offers: [{ track: 'direct', priceMan: 5000, subOpt: '보증금 조정 협의', cond: '카페 창업 희망' }] },
-      { id: 'item4', mode: 'normal', dealType: 'lease', category: 'apartment', badge: '아파트 전세', location: '서울 마포구 공덕동 450', title: '공덕 파크자이 로얄층 아파트 전세', lat: 37.5430, lng: 126.9510, priceMan: 90000, depositMan: 90000, rentMan: 0, yieldRate: 0, offers: [{ track: 'direct', priceMan: 90000, subOpt: '전세자금대출 가능', cond: 'LH 버팀목 가능' }] }
+      { id: 'item1', mode: 'normal', category: 'apartment', dealType: 'sale', badge: '아파트 매매', location: '서울 마포구 아현동 777', title: '마포래미안푸르지오 34평 남향 매매', lat: 37.5562, lng: 126.9536, priceMan: 165000, depositMan: 0, rentMan: 0, yieldRate: 0, offers: [{ track: 'direct', priceMan: 162000, subOpt: '실거주 직거래', cond: '즉시 입주' }] },
+      { id: 'item2', mode: 'normal', category: 'apartment', dealType: 'lease', badge: '아파트 전세', location: '서울 마포구 공덕동 450', title: '공덕 파크자이 로얄층 아파트 전세', lat: 37.5430, lng: 126.9510, priceMan: 90000, depositMan: 90000, rentMan: 0, yieldRate: 0, offers: [{ track: 'direct', priceMan: 90000, subOpt: '대출 가능', cond: '즉시 입주' }] },
+      { id: 'item3', mode: 'normal', category: 'commercial', dealType: 'sale', badge: '상가 매매', location: '서울 강남구 역삼동 152', title: '강남구 역삼동 초역세권 1층 수익형 상가 매매', lat: 37.5006, lng: 127.0364, priceMan: 100000, depositMan: 5000, rentMan: 400, yieldRate: 5.05, offers: [{ track: 'agent', priceMan: 99500, subOpt: '중개보수 0.3%', cond: '프랜차이즈 대기' }] },
+      { id: 'item4', mode: 'normal', category: 'commercial', dealType: 'lease', badge: '상가 월세', location: '서울 강남구 테헤란로 100', title: '역삼역 1층 코너 상가 월세', lat: 37.5015, lng: 127.0380, priceMan: 5000, depositMan: 5000, rentMan: 350, yieldRate: 0, offers: [{ track: 'direct', priceMan: 5000, subOpt: '보증금 조정', cond: '카페 창업' }] },
+      { id: 'item5', mode: 'normal', category: 'villa', dealType: 'sale', badge: '주택 매매', location: '서울 종로구 서촌 12', title: '서촌 리모델링 단독주택 매매', lat: 37.5791, lng: 126.9704, priceMan: 85000, depositMan: 0, rentMan: 0, yieldRate: 0, offers: [] },
+      { id: 'item6', mode: 'normal', category: 'villa', dealType: 'lease', badge: '빌라 전세', location: '서울 용산구 이태원동 88', title: '이태원 신축 빌라 투룸 전세', lat: 37.5340, lng: 126.9940, priceMan: 45000, depositMan: 45000, rentMan: 0, yieldRate: 0, offers: [] }
     ];
 
     let currentMarketMode = 'normal';
-    let currentDealType = 'sale'; // 기본 매매관
+    let currentCategory = 'apartment'; // 기본 아파트 탭
     let currentRole = 'visitor';
-    let currentCategory = 'all';
     let selectedId = 'item1';
     let currentTrack = 'direct';
 
@@ -232,7 +231,7 @@
 
     function initKakaoMap() {
       kakaoMap = new kakao.maps.Map(document.getElementById('map'), {
-        center: new kakao.maps.LatLng(37.5006, 127.0364),
+        center: new kakao.maps.LatLng(37.5562, 126.9536),
         level: 5
       });
       renderMarkers();
@@ -284,31 +283,13 @@
       return `${man.toLocaleString()}만`;
     }
 
-    // 매매관 vs 전월세관 탭 전환
-    function switchDealType(dealType) {
-      currentDealType = dealType;
-      currentCategory = 'all'; // 탭 바꿀 때 전체로 초기화
-
-      const saleBtn = document.getElementById('deal-sale');
-      const leaseBtn = document.getElementById('deal-lease');
-
-      if (dealType === 'sale') {
-        saleBtn.className = "px-4 py-1.5 rounded-lg font-extrabold bg-blue-600 text-white shadow-sm transition";
-        leaseBtn.className = "px-4 py-1.5 rounded-lg font-bold text-slate-600 hover:text-slate-900 transition";
-      } else {
-        leaseBtn.className = "px-4 py-1.5 rounded-lg font-extrabold bg-purple-600 text-white shadow-sm transition";
-        saleBtn.className = "px-4 py-1.5 rounded-lg font-bold text-slate-600 hover:text-slate-900 transition";
-      }
-
-      filterCategory('all');
-    }
-
-    function filterCategory(cat) {
+    // 3대 탭 전환
+    function switchCategory(cat) {
       currentCategory = cat;
-      ['all', 'commercial', 'apartment', 'villa'].forEach(c => {
-        const btn = document.getElementById(`cat-${c}`);
+      ['apartment', 'commercial', 'villa'].forEach(c => {
+        const btn = document.getElementById(`tab-${c}`);
         if(btn) {
-          btn.className = c === cat ? "px-3 py-1 rounded-full font-bold bg-slate-900 text-white" : "px-3 py-1 rounded-full font-semibold bg-slate-100 text-slate-600";
+          btn.className = c === cat ? "px-4 py-1.5 rounded-lg font-extrabold bg-blue-600 text-white shadow-sm transition" : "px-4 py-1.5 rounded-lg font-bold text-slate-600 hover:text-slate-900 transition";
         }
       });
       renderMarkers();
@@ -321,15 +302,13 @@
 
       const filtered = listings.filter(item => {
         if (item.mode !== currentMarketMode) return false;
-        if (item.dealType !== currentDealType) return false;
-        if (currentCategory !== 'all' && item.category !== currentCategory) return false;
+        if (item.category !== currentCategory) return false;
         return true;
       });
 
       filtered.forEach(item => {
         // 색상 구분: 매매는 파란색, 전월세는 보자주색 계열
-        let pinBg = item.dealType === 'sale' ? 'bg-blue-600' : 'bg-purple-600';
-        if (item.category === 'apartment') pinBg = item.dealType === 'sale' ? 'bg-sky-600' : 'bg-fuchsia-600';
+        const pinBg = item.dealType === 'sale' ? 'bg-blue-600' : 'bg-purple-600';
 
         const content = document.createElement('div');
         content.className = `custom-pin ${pinBg} text-white px-3 py-1.5 rounded-2xl shadow-xl border-2 border-white whitespace-nowrap`;
@@ -375,18 +354,18 @@
       document.getElementById('detail-title').innerText = item.title;
 
       if (item.dealType === 'sale') {
-        document.getElementById('box-label-1').innerText = "매도 희망가";
+        document.getElementById('box-label-1').innerText = "매도가";
         document.getElementById('box-label-2').innerText = "보증금 / 월세";
-        document.getElementById('box-label-3').innerText = "연 수익률";
+        document.getElementById('box-label-3').innerText = "수익률 / 특징";
         document.getElementById('stat-val-1').innerText = formatPriceMan(item.priceMan, 'sale');
         document.getElementById('stat-val-2').innerText = item.rentMan > 0 ? `${item.depositMan.toLocaleString()}만/${item.rentMan}만` : `공실/입주협의`;
-        document.getElementById('stat-val-3').innerText = item.yieldRate > 0 ? `${item.yieldRate}%` : '실거주';
+        document.getElementById('stat-val-3').innerText = item.yieldRate > 0 ? `${item.yieldRate}%` : '실거주 매매';
       } else {
         document.getElementById('box-label-1').innerText = "보증금 (전세가)";
         document.getElementById('box-label-2').innerText = "월세 금액";
-        document.getElementById('box-label-3').innerText = "관리비/조건";
+        document.getElementById('box-label-3').innerText = "입주 조건";
         document.getElementById('stat-val-1').innerText = formatPriceMan(item.priceMan, 'lease');
-        document.getElementById('stat-val-2').innerText = item.rentMan > 0 ? `${item.rentMan}만 원` : `전세 (월세 없음)`;
+        document.getElementById('stat-val-2').innerText = item.rentMan > 0 ? `${item.rentMan}만 원` : `전세 (무월세)`;
         document.getElementById('stat-val-3').innerText = "즉시 입주가능";
       }
 
@@ -448,35 +427,55 @@
       renderMarkers();
     }
 
-    // 등록 모달
+    // 등록 모달 및 스마트 폼 제어
     function openRegisterModal() { document.getElementById('register-modal').classList.remove('hidden'); }
     function closeRegisterModal() { document.getElementById('register-modal').classList.add('hidden'); }
 
-    function saveNewListing() {
+    function onRegDealTypeChange() {
       const dealType = document.getElementById('reg-dealType').value;
+      const labelP1 = document.getElementById('label-p1');
+      const boxDep = document.getElementById('reg-box-dep');
+      const boxRent = document.getElementById('reg-box-rent');
+
+      if (dealType === 'sale') {
+        labelP1.innerText = "매도가(만)";
+        boxDep.style.display = "block";
+        boxRent.style.display = "block";
+      } else {
+        labelP1.innerText = "보증금/전세(만)";
+        boxDep.style.display = "none";
+        boxRent.style.display = "block";
+      }
+    }
+
+    function saveNewListing() {
       const cat = document.getElementById('reg-cat').value;
-      const loc = document.getElementById('reg-address').value || '서울 강남구 역삼동';
+      const dealType = document.getElementById('reg-dealType').value;
+      const loc = document.getElementById('reg-address').value || '서울 마포구 아현동';
       const title = document.getElementById('reg-title').value || '신규 등록 매물';
       const priceMan = parseInt(document.getElementById('reg-price').value, 10) || 10000;
-      const depMan = parseInt(document.getElementById('reg-dep').value, 10) || 1000;
-      const rentMan = parseInt(document.getElementById('reg-rent').value, 10) || 50;
+      const depMan = dealType === 'sale' ? (parseInt(document.getElementById('reg-dep').value, 10) || 0) : priceMan;
+      const rentMan = parseInt(document.getElementById('reg-rent').value, 10) || 0;
       const yieldRate = (dealType === 'sale' && rentMan > 0) ? parseFloat((((rentMan * 12) / (priceMan - depMan)) * 100).toFixed(2)) : 0;
+
+      const catNameMap = { apartment: '아파트', commercial: '상가', villa: '주택' };
+      const badgeText = `${catNameMap[cat]} ${dealType === 'sale' ? '매매' : '전월세'}`;
 
       const geocoder = new kakao.maps.services.Geocoder();
       geocoder.addressSearch(loc, function(result, status) {
-        let lat = 37.5006, lng = 127.0364;
+        let lat = 37.5562, lng = 126.9536;
         if (status === kakao.maps.services.Status.OK) {
           lat = parseFloat(result[0].y);
           lng = parseFloat(result[0].x);
         }
         const newId = 'item_' + Date.now();
         listings.unshift({
-          id: newId, mode: 'normal', dealType, category: cat,
-          badge: (dealType === 'sale' ? '매매' : '전월세') + ' · 신규',
-          location: loc, title, lat, lng, priceMan, depositMan: depMan, rentMan, yieldRate, offers: []
+          id: newId, mode: 'normal', category: cat, dealType,
+          badge: badgeText, location: loc, title, lat, lng,
+          priceMan, depositMan: depMan, rentMan, yieldRate, offers: []
         });
         closeRegisterModal();
-        switchDealType(dealType);
+        switchCategory(cat);
         renderMarkers();
         selectListing(newId);
         kakaoMap.panTo(new kakao.maps.LatLng(lat, lng));
@@ -494,7 +493,7 @@
           container.innerHTML += `
             <div class="p-3 rounded-xl border border-slate-200 bg-slate-50 flex justify-between items-center">
               <div>
-                <div class="font-extrabold text-slate-900">[${item.dealType === 'sale' ? '매매' : '전월세'}] ${item.title}</div>
+                <div class="font-extrabold text-slate-900">[${item.badge}] ${item.title}</div>
                 <div class="text-[11px] text-slate-500">${item.location} | 가격: ${formatPriceMan(item.priceMan, item.dealType)}</div>
               </div>
               <div class="flex space-x-1.5">
