@@ -1,0 +1,791 @@
+<immersive id="openbid-app" type="code" title="오픈비드(OpenBid) - 카카오맵(지적도·로드뷰) & 실제 도로명 주소검색 탑재 버전">
+```html
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>오픈비드(OpenBid) - 카카오맵 실전 연동 버전</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 1. 카카오 우편번호/도로명 주소 검색 공식 API (키 없이 즉시 작동) -->
+  <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+  <!-- 2. 폴백용 기본 지도 엔진 (카카오맵 키 입력 전까지 작동) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+    body { font-family: 'Pretendard', sans-serif; }
+    .custom-pin { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
+    .custom-pin:hover { transform: translateY(-4px) scale(1.06); z-index: 9999 !important; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  </style>
+</head>
+<body class="bg-slate-100 h-screen flex flex-col overflow-hidden select-none">
+
+  <!-- 🟡 최상단: 카카오맵 API 키 즉시 연동 콘솔 바 -->
+  <div id="kakao-setup-bar" class="bg-amber-400 text-slate-950 px-5 py-2 flex flex-wrap justify-between items-center z-40 shadow-sm border-b border-amber-500">
+    <div class="flex items-center space-x-2 text-xs font-bold">
+      <span class="bg-slate-950 text-amber-400 px-2 py-0.5 rounded font-black">KAKAO MAP 연동 대기중</span>
+      <span id="engine-status-text">현재 기본 지도로 작동 중입니다. 발급받은 <b>카카오 JavaScript 키</b>를 입력하면 즉시 실제 카카오맵 + 지적도 + 로드뷰가 켜집니다!</span>
+    </div>
+    <div class="flex items-center space-x-2">
+      <input id="kakao-key-input" type="text" placeholder="여기에 카카오 JavaScript 키 붙여넣기 (예: a1b2c3d4...)" class="px-3 py-1 rounded-lg text-xs font-mono bg-white border border-amber-600 w-72 outline-none focus:ring-2 focus:ring-slate-900">
+      <button onclick="activateKakaoMap()" class="bg-slate-900 text-white px-3.5 py-1 rounded-lg text-xs font-black hover:bg-slate-800 transition shadow">카카오맵 즉시 켜기</button>
+      <button onclick="openGuideModal()" class="bg-amber-200 border border-amber-600 text-slate-900 px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-amber-300 transition">❓ 3분 키 발급 방법</button>
+    </div>
+  </div>
+
+  <!-- 1. 메인 네비게이션 바 -->
+  <header class="bg-white border-b border-slate-200 px-5 py-2.5 flex justify-between items-center z-30 shadow-sm">
+    <div class="flex items-center space-x-3">
+      <div class="flex items-center space-x-1.5">
+        <div class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-lg shadow-sm">O</div>
+        <span class="text-xl font-black text-slate-900 tracking-tight">OPEN<span class="text-blue-600">BID</span></span>
+      </div>
+      <span class="hidden md:inline-block text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold">광고 0% · 반(半)블라인드 · 듀얼입찰</span>
+    </div>
+
+    <!-- 거래 모드 스위치 (일반 매물 입찰 vs 역경매 매수 대기표) -->
+    <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+      <button onclick="switchMarketMode('normal')" id="mode-normal" class="px-3.5 py-1.5 rounded-lg text-xs font-extrabold bg-white text-blue-600 shadow-sm transition flex items-center space-x-1">
+        <span>🏢 매물 입찰 (집주인 등록)</span>
+      </button>
+      <button onclick="switchMarketMode('reverse')" id="mode-reverse" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition flex items-center space-x-1">
+        <span>🔥 역경매 (매수자 선제시 대기표)</span>
+      </button>
+    </div>
+
+    <!-- 시점 전환 시뮬레이터 & 매물 등록 -->
+    <div class="flex items-center space-x-3">
+      <div class="flex items-center bg-slate-900 text-white p-1 rounded-xl text-xs">
+        <span class="px-2 text-[11px] text-slate-300 font-medium">시점 전환:</span>
+        <button onclick="toggleRole('visitor')" id="role-visitor" class="px-2.5 py-1 rounded-lg font-bold bg-blue-600 text-white transition">👁️ 일반 방문자 (블라인드)</button>
+        <button onclick="toggleRole('owner')" id="role-owner" class="px-2.5 py-1 rounded-lg font-medium text-slate-300 hover:text-white transition">🔑 집주인 본인 (실제가 공개)</button>
+      </div>
+      <button onclick="openRegisterModal()" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-extrabold hover:bg-blue-700 shadow-md transition active:scale-95">+ 실제 주소로 매물 등록</button>
+    </div>
+  </header>
+
+  <!-- 2. 서브 필터 바 -->
+  <div class="bg-white/95 border-b border-slate-200 px-5 py-2 flex justify-between items-center z-20 text-xs">
+    <div class="flex items-center space-x-1.5">
+      <span class="text-slate-400 font-bold mr-1">카테고리:</span>
+      <button onclick="filterCategory('all')" id="cat-all" class="px-3 py-1 rounded-full font-bold bg-slate-900 text-white">전체</button>
+      <button onclick="filterCategory('commercial')" id="cat-commercial" class="px-3 py-1 rounded-full font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">수익형 상가/빌딩</button>
+      <button onclick="filterCategory('apartment')" id="cat-apartment" class="px-3 py-1 rounded-full font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">아파트/오피스텔</button>
+      <button onclick="filterCategory('villa')" id="cat-villa" class="px-3 py-1 rounded-full font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">빌라/단독/토지</button>
+    </div>
+    <div class="flex items-center space-x-2 text-slate-600">
+      <span class="font-bold text-slate-400">공정 데이터 정렬:</span>
+      <select onchange="sortProperties(this.value)" class="border border-slate-300 rounded-lg px-2.5 py-1 font-bold text-slate-800 bg-white outline-none">
+        <option value="bids">입찰/제안 뜨거운 순</option>
+        <option value="yield">연 수익률 높은 순 (상가)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- 3. 메인 워크스페이스 (좌측: 지도 + 지적도/로드뷰 컨트롤 / 우측: 상세 & 듀얼트랙 입찰) -->
+  <div class="flex-1 flex overflow-hidden relative">
+    
+    <!-- 좌측: 지도 영역 -->
+    <div class="w-7/12 h-full relative border-r border-slate-300 z-10">
+      <div id="map" class="w-full h-full"></div>
+
+      <!-- 로드뷰 컨테이너 (활성화 시 지도 위에 오버레이) -->
+      <div id="roadview-Wrap" class="hidden absolute inset-0 bg-slate-900 z-[500] flex flex-col">
+        <div class="bg-slate-900 text-white px-4 py-2.5 flex justify-between items-center">
+          <div class="flex items-center space-x-2">
+            <span class="bg-amber-400 text-slate-950 text-xs font-black px-2 py-0.5 rounded">KAKAO 로드뷰</span>
+            <span id="rv-title" class="text-sm font-bold">상가 1층 외관 및 전면 도로 확인</span>
+          </div>
+          <button onclick="closeRoadview()" class="bg-rose-600 text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-rose-700">✕ 로드뷰 닫고 지도로 돌아가기</button>
+        </div>
+        <div id="roadview" class="flex-1 w-full"></div>
+      </div>
+
+      <!-- 지도 위 부동산 전용 도구 컨트롤 (지적도 켜기 / 상가 로드뷰 보기) -->
+      <div class="absolute top-3 right-3 z-[400] flex flex-col space-y-2">
+        <button onclick="toggleCadastral()" id="btn-cadastral" class="bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-lg border border-slate-300 text-xs font-black text-slate-800 hover:bg-amber-50 flex items-center space-x-1.5 transition">
+          <span>📐 지적도(토지경계선) 켜기</span>
+        </button>
+        <button onclick="openRoadview()" id="btn-roadview" class="bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-lg border border-slate-300 text-xs font-black text-slate-800 hover:bg-amber-50 flex items-center space-x-1.5 transition">
+          <span>📸 선택 매물 로드뷰(1층 외관)</span>
+        </button>
+      </div>
+
+      <!-- 지도 위 안내 오버레이 -->
+      <div id="map-floating-banner" class="absolute top-3 left-14 bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-md text-xs text-slate-700 font-semibold z-[400] border border-slate-200 flex items-center space-x-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-blue-600 animate-ping"></span>
+        <span id="map-banner-text">지도 위 핀을 클릭해 보세요! 우측 상단에서 [집주인 시점]을 켜면 블라인드 가격이 해제됩니다.</span>
+      </div>
+    </div>
+
+    <!-- 우측: 상세 브리핑 & 반블라인드 듀얼트랙 호가창 -->
+    <div class="w-5/12 bg-white flex flex-col h-full overflow-hidden z-10">
+      
+      <div class="flex-1 overflow-y-auto p-6">
+        <!-- 매물 헤더 -->
+        <div class="border-b border-slate-100 pb-4 mb-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <span id="detail-badge" class="bg-blue-100 text-blue-800 text-xs font-extrabold px-2.5 py-1 rounded-md">수익형 상가</span>
+              <span id="detail-Location" class="text-xs font-bold text-slate-500">서울 강남구 역삼동</span>
+            </div>
+            <span id="blind-status-pill" class="text-[11px] bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-bold">🔒 반(半) 블라인드 보호중</span>
+          </div>
+          <h2 id="detail-title" class="text-xl font-black mt-2 text-slate-900 leading-snug">강남구 역삼동 초역세권 1층 수익형 상가</h2>
+          <p id="detail-subdesc" class="text-xs text-slate-500 mt-1">세입자 영업 보호 및 담합 방지를 위해 상세 호수와 입찰 상세가는 집주인에게만 공개됩니다.</p>
+        </div>
+
+        <!-- 핵심 데이터 요약 카드 -->
+        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-5 grid grid-cols-3 gap-2 text-center shadow-sm">
+          <div>
+            <div id="stat-label-1" class="text-[11px] text-slate-400 font-bold">매도 희망가 (시작가)</div>
+            <div id="stat-val-1" class="text-base font-black text-slate-900 mt-0.5">10억 원</div>
+          </div>
+          <div class="border-l border-r border-slate-200 px-1">
+            <div id="stat-label-2" class="text-[11px] text-slate-400 font-bold">보증금 / 월세</div>
+            <div id="stat-val-2" class="text-sm font-extrabold text-slate-800 mt-1">5,000만 / 400만</div>
+          </div>
+          <div>
+            <div id="stat-label-3" class="text-[11px] text-slate-400 font-bold">자동 계산 연 수익률</div>
+            <div id="stat-val-3" class="text-base font-black text-blue-600 mt-0.5">5.05%</div>
+          </div>
+        </div>
+
+        <!-- 반(半) 블라인드 안내 배너 -->
+        <div id="role-explain-banner" class="mb-4 p-3 rounded-xl bg-slate-900 text-white text-xs flex justify-between items-center">
+          <div>
+            <span class="font-extrabold text-amber-400">👁️ 일반 방문자 시점:</span>
+            <span class="text-slate-200 ml-1">가격 담합 방지를 위해 입찰가는 구간으로만 표시됩니다.</span>
+          </div>
+          <button onclick="toggleRole('owner')" class="bg-amber-400 text-slate-950 font-black px-2.5 py-1 rounded-lg text-[11px] hover:bg-amber-300 shrink-0 ml-2">집주인 시점 켜기</button>
+        </div>
+
+        <!-- 듀얼 트랙 입찰 현황 헤더 -->
+        <div class="flex justify-between items-center mb-3">
+          <div class="flex items-center space-x-1.5">
+            <h3 id="bid-section-title" class="font-extrabold text-slate-900 text-sm">📊 실시간 듀얼트랙 오퍼 현황</h3>
+          </div>
+          <span id="bid-count-badge" class="text-xs bg-rose-100 text-rose-600 px-2.5 py-0.5 rounded-full font-extrabold">총 3건 경쟁중</span>
+        </div>
+
+        <!-- 입찰 리스트 -->
+        <div id="bid-list-container" class="space-y-2.5 mb-4"></div>
+      </div>
+
+      <!-- 하단 고정: 듀얼 트랙 입찰/제안 입력창 -->
+      <div class="bg-slate-50 p-4 border-t border-slate-200">
+        <div class="flex justify-between items-center mb-2">
+          <span id="form-title" class="text-xs font-extrabold text-slate-800">💡 이 매물에 오퍼(호가+조건) 던지기</span>
+          <span class="text-[11px] text-blue-600 font-bold">집주인에게만 정확한 금액이 전달됩니다</span>
+        </div>
+
+        <div id="track-selector" class="grid grid-cols-2 gap-1.5 bg-slate-200 p-1 rounded-xl mb-2.5 text-xs">
+          <button onclick="selectTrack('direct')" id="track-btn-direct" class="py-1.5 rounded-lg font-extrabold bg-white text-blue-600 shadow-sm transition">
+            트랙A: 일반 매수자 (복비 0원 직거래)
+          </button>
+          <button onclick="selectTrack('agent')" id="track-btn-agent" class="py-1.5 rounded-lg font-bold text-slate-600 hover:text-slate-900 transition">
+            트랙B: 공인중개사 (손님매칭+복비할인)
+          </button>
+        </div>
+
+        <div class="flex space-x-2 mb-2">
+          <div class="relative flex-1">
+            <input id="input-price" type="number" placeholder="제안 금액 (만원 단위, 예: 98000)" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold bg-white outline-none focus:ring-2 focus:ring-blue-500">
+            <span class="absolute right-3 top-2 text-[11px] text-slate-400 font-bold">만원</span>
+          </div>
+          <select id="input-sub-option" class="border border-slate-300 rounded-xl px-2.5 py-2 text-xs font-bold bg-white text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="현금 잔금 1개월 내">현금 잔금 1개월 내</option>
+            <option value="포괄양수도 승계 희망">포괄양수도 승계 희망</option>
+            <option value="대출 승인 완료 (잔금 2개월)">대출 승인 완료 (잔금 2개월)</option>
+          </select>
+        </div>
+
+        <div class="flex space-x-2">
+          <input id="input-condition" type="text" placeholder="상세 조건 (예: 권리금 무상 조건 / 프랜차이즈 입점 확정 손님 대기중)" class="border border-slate-300 rounded-xl px-3 py-2 text-xs flex-1 bg-white outline-none focus:ring-2 focus:ring-blue-500">
+          <button onclick="submitOffer()" class="bg-blue-600 text-white font-extrabold px-4 py-2 rounded-xl text-xs hover:bg-blue-700 transition shadow-md shrink-0">오퍼 등록</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 4. 모달 1: 카카오 우편번호/도로명 주소 검색 탑재 매물 등록창 -->
+  <div id="register-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-6 w-[480px] shadow-2xl border border-slate-200">
+      <div class="flex justify-between items-center border-b pb-3 mb-4">
+        <h3 class="text-base font-black text-slate-900">📍 실제 도로명 주소로 매물 / 역경매 1분 등록</h3>
+        <button onclick="closeRegisterModal()" class="text-slate-400 hover:text-slate-700 font-bold text-lg">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">등록 유형</label>
+            <select id="reg-mode" class="w-full border border-slate-300 rounded-xl p-2 font-bold bg-slate-50">
+              <option value="normal">🏢 내 부동산 팔기 (입찰 받기)</option>
+              <option value="reverse">🔥 부동산 사기 (역경매 대기표)</option>
+            </select>
+          </div>
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">부동산 카테고리</label>
+            <select id="reg-cat" class="w-full border border-slate-300 rounded-xl p-2 font-bold bg-slate-50">
+              <option value="commercial">수익형 상가/빌딩</option>
+              <option value="apartment">아파트/오피스텔</option>
+              <option value="villa">빌라/단독/토지</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 실제 카카오 우편번호 검색 연동 영역 -->
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">실제 주소 검색 (카카오 공식 우편번호 API 연동)</label>
+          <div class="flex space-x-2">
+            <input id="reg-address" type="text" readonly placeholder="우측 버튼을 눌러 실제 도로명/지번 주소를 검색하세요" class="flex-1 border border-slate-300 rounded-xl p-2 bg-slate-50 font-bold text-slate-800">
+            <button onclick="execKakaoPostcode()" class="bg-amber-400 text-slate-950 font-black px-3.5 py-2 rounded-xl hover:bg-amber-300 shrink-0 shadow-sm">🔍 카카오 주소검색</button>
+          </div>
+        </div>
+
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">매물 한 줄 제목</label>
+          <input id="reg-title" type="text" placeholder="예: 성수동 연무장길 1층 코너 수익형 상가" class="w-full border border-slate-300 rounded-xl p-2 font-medium">
+        </div>
+
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">희망 매도가(만원)</label>
+            <input id="reg-price" type="number" placeholder="110000 (11억)" class="w-full border border-slate-300 rounded-xl p-2 font-bold">
+          </div>
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">현재 보증금(만원)</label>
+            <input id="reg-dep" type="number" placeholder="5000" class="w-full border border-slate-300 rounded-xl p-2">
+          </div>
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">현재 월세(만원)</label>
+            <input id="reg-rent" type="number" placeholder="420" class="w-full border border-slate-300 rounded-xl p-2">
+          </div>
+        </div>
+        <div class="bg-blue-50 text-blue-800 p-2.5 rounded-xl text-[11px] font-medium leading-relaxed">
+          ✨ <b>카카오 주소검색</b>으로 주소를 입력하시면 연 수익률이 자동 계산되어 지도 위 해당 위치에 즉시 핀이 꽂힙니다!
+        </div>
+      </div>
+
+      <div class="mt-5 flex space-x-2">
+        <button onclick="closeRegisterModal()" class="flex-1 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-600 hover:bg-slate-100">취소</button>
+        <button onclick="saveNewListing()" class="flex-1 py-2.5 rounded-xl bg-blue-600 text-white font-extrabold text-xs hover:bg-blue-700 shadow-md">지도에 즉시 등록하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. 모달 2: 카카오 API 키 3분 발급 가이드 -->
+  <div id="guide-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-6 w-[520px] shadow-2xl border border-slate-200">
+      <div class="flex justify-between items-center border-b pb-3 mb-4">
+        <h3 class="text-base font-black text-slate-900">🟡 신용카드 없이 3분 만에 카카오맵 키 발급받는 법</h3>
+        <button onclick="closeGuideModal()" class="text-slate-400 hover:text-slate-700 font-bold text-lg">✕</button>
+      </div>
+      <ol class="space-y-3 text-xs text-slate-700 leading-relaxed list-decimal list-inside">
+        <li><b>카카오 디벨로퍼스 접속:</b> 새 탭에서 <a href="https://developers.kakao.com" target="_blank" class="text-blue-600 underline font-bold">developers.kakao.com</a> 에 접속해 본인 카카오톡으로 로그인합니다.</li>
+        <li><b>내 애플리케이션 만들기:</b> 상단 메뉴 <b>[내 애플리케이션]</b> 클릭 ➔ <b>[애플리케이션 추가하기]</b> ➔ 앱 이름에 <code>오픈비드</code>, 회사명에 본인 이름을 적고 저장합니다.</li>
+        <li><b>웹 도메인 등록 (중요):</b> 생성된 앱을 클릭 ➔ 좌측 메뉴 <b>[앱 설정] - [플랫폼]</b> ➔ <b>[Web 플랫폼 등록]</b>에 현재 브라우저 주소(또는 로컬 테스트 시 <code>http://localhost</code> 등)를 추가합니다.</li>
+        <li><b>지도 기능 활성화:</b> 좌측 메뉴 <b>[제품 설정] - [카카오맵]</b>을 누르고 <b>[사용 설정] 스위치를 ON</b>으로 켭니다.</li>
+        <li><b>JavaScript 키 복사:</b> 좌측 메뉴 <b>[앱 키]</b>에 들어가서 4가지 키 중 <b>[JavaScript 키]</b> 옆의 복사 버튼을 누른 뒤, 이 화면 맨 위 노란색 입력창에 붙여넣으면 끝납니다!</li>
+      </ol>
+      <div class="mt-5">
+        <button onclick="closeGuideModal()" class="w-full py-2.5 rounded-xl bg-slate-900 text-white font-extrabold text-xs hover:bg-slate-800">확인했습니다</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. 모달 3: 오퍼 채택 시 1:1 안심채팅 & 법무·세무 패키지 -->
+  <div id="accept-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-6 w-[460px] shadow-2xl border border-slate-200">
+      <div class="flex items-center space-x-2 text-emerald-600 font-black text-sm mb-1">
+        <span>✅ 오퍼 채택 및 안심 매칭 완료!</span>
+      </div>
+      <h3 id="accept-modal-title" class="text-lg font-black text-slate-900 mb-3">9억 9,500만 원 제안자와 1:1 연결되었습니다</h3>
+      <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1.5 mb-4">
+        <div class="flex justify-between"><span class="text-slate-500">참여 트랙:</span><span id="accept-track" class="font-bold text-slate-900">파트너 공인중개사</span></div>
+        <div class="flex justify-between"><span class="text-slate-500">제안 조건:</span><span id="accept-cond" class="font-bold text-blue-600">중개보수 0.3% 인하 + 법인 손님 즉시 계약</span></div>
+        <div class="flex justify-between"><span class="text-slate-500">상세 주소 공개:</span><span class="font-bold text-emerald-600">해당 입찰자에게만 번지/호수 잠금 해제됨</span></div>
+      </div>
+      <div class="border-2 border-blue-600 bg-blue-50/40 p-3.5 rounded-xl mb-5">
+        <div class="text-xs font-black text-blue-900 mb-2">🛡️ 원스톱 법무·세무 안전 패키지 (선택)</div>
+        <label class="flex items-center space-x-2 text-xs font-bold text-slate-800 mb-1.5 cursor-pointer">
+          <input type="checkbox" checked class="rounded text-blue-600">
+          <span>파트너 법무사·세무사 패키지 (포괄양수도 + 등기 45만 원 정액)</span>
+        </label>
+        <label class="flex items-center space-x-2 text-xs font-bold text-slate-800 cursor-pointer">
+          <input type="checkbox" checked class="rounded text-blue-600">
+          <span>계약금 먹튀 방지 신탁사 에스크로 예치 계좌 사용</span>
+        </label>
+      </div>
+      <button onclick="closeAcceptModal()" class="w-full py-2.5 rounded-xl bg-blue-600 text-white font-extrabold text-xs hover:bg-blue-700 shadow-md">확인 및 1:1 안심 채팅 시작</button>
+    </div>
+  </div>
+
+  <script>
+    // 1. 매물 & 역경매 통합 데이터베이스
+    const listings = [
+      {
+        id: 'item1', mode: 'normal', category: 'commercial',
+        badge: '수익형 상가 · 1층 코너', location: '서울 강남구 테헤란로 152 (역삼동)',
+        title: '강남구 역삼동 초역세권 1층 수익형 알짜 상가',
+        lat: 37.5006, lng: 127.0364,
+        priceMan: 100000, depositMan: 5000, rentMan: 400, yieldRate: 5.05,
+        offers: [
+          { track: 'agent', priceMan: 99500, subOpt: '중개보수 0.3% (반값 인하)', cond: '유명 카페 프랜차이즈 직영점 입점 희망 손님 대기중' },
+          { track: 'direct', priceMan: 97500, subOpt: '현금 잔금 1개월 내 (복비 0원)', cond: '대출 없이 현금 완납 가능, 포괄양수도 계약 및 법무사 패키지 희망' },
+          { track: 'agent', priceMan: 98000, subOpt: '매도인 수수료 0원 (매수인 전액부담)', cond: '인근 병원 원장님 투자 매수 대기, 이번 주 토요일 오후 현장 방문 희망' }
+        ]
+      },
+      {
+        id: 'item2', mode: 'normal', category: 'commercial',
+        badge: '수익형 상가 · 성수 카페거리', location: '서울 성동구 연무장길 45 (성수동2가)',
+        title: '성수동 연무장길 메인 스트리트 1층 통상가',
+        lat: 37.5445, lng: 127.0560,
+        priceMan: 150000, depositMan: 10000, rentMan: 630, yieldRate: 5.40,
+        offers: [
+          { track: 'direct', priceMan: 146000, subOpt: '법인 사옥 겸 쇼룸 직거래', cond: '패션 브랜드 본사 직접 매수 희망, 계약금 10% 즉시 에스크로 예치 가능' },
+          { track: 'agent', priceMan: 149000, subOpt: '중개보수 0.4% 제안', cond: '성수동 전문 부동산입니다. 현금 100억대 보유 자산가 매수 의향 확보' }
+        ]
+      },
+      {
+        id: 'item3', mode: 'normal', category: 'apartment',
+        badge: '아파트 · 34평 로얄동', location: '서울 마포구 마포대로 195 (아현동)',
+        title: '마포래미안푸르지오 3단지 34평 남향 고층',
+        lat: 37.5562, lng: 126.9536,
+        priceMan: 165000, depositMan: 80000, rentMan: 0, yieldRate: 0,
+        offers: [
+          { track: 'direct', priceMan: 162000, subOpt: '실거주 직거래 (복비 0원)', cond: '현재 전세 만기 퇴거 조건, 잔금일 집주인 일정에 100% 맞춤 가능' },
+          { track: 'agent', priceMan: 164500, subOpt: '중개보수 반값 (0.25%) 제안', cond: '신혼부부 매수 손님 확보, 주말 오픈하우스 시간에 맞춰 방문 가능' }
+        ]
+      },
+      {
+        id: 'rev1', mode: 'reverse', category: 'commercial',
+        badge: '🔥 매수 대기표 (역경매)', location: '서울 강남구 역삼/선릉/신사 일대',
+        title: '[매수희망] 강남권 1층 상가 11억 이하 현금 매수합니다',
+        lat: 37.5085, lng: 127.0410,
+        priceMan: 110000, depositMan: 5000, rentMan: 400, yieldRate: 4.50,
+        offers: [
+          { track: 'direct', priceMan: 108000, subOpt: '집주인 직접 매도 제안', cond: '선릉역 도보 4분 1층 베이커리 운영중 상가 소유주입니다. 연 수익률 4.8% 나옵니다.' }
+        ]
+      }
+    ];
+
+    let currentMarketMode = 'normal';
+    let currentRole = 'visitor';
+    let currentCategory = 'all';
+    let selectedId = 'item1';
+    let currentTrack = 'direct';
+
+    // 지도 엔진 상태 ('leaflet' 또는 'kakao')
+    let mapEngine = 'leaflet';
+    let leafletMap = null;
+    let leafletMarkers = [];
+    let kakaoMap = null;
+    let kakaoOverlays = [];
+    let isCadastralOn = false;
+
+    // 초기 기본 지도(Leaflet) 세팅
+    function initLeaflet() {
+      leafletMap = L.map('map', { zoomControl: false }).setView([37.5280, 127.0150], 12);
+      L.control.zoom({ position: 'bottomleft' }).addTo(leafletMap);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(leafletMap);
+    }
+
+    // 🟡 사용자가 카카오 JavaScript 키를 입력했을 때 실제 카카오맵으로 즉시 전환!
+    function activateKakaoMap() {
+      const apiKey = document.getElementById('kakao-key-input').value.trim();
+      if (!apiKey) {
+        alert('발급받으신 카카오 JavaScript 키를 입력창에 붙여넣어 주세요!');
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${apiKey}&libraries=services&autoload=false`;
+      script.onload = () => {
+        kakao.maps.load(() => {
+          // 기존 Leaflet 제거 후 카카오맵 초기화
+          if (leafletMap) {
+            leafletMap.remove();
+            leafletMap = null;
+          }
+          const container = document.getElementById('map');
+          container.innerHTML = '';
+          kakaoMap = new kakao.maps.Map(container, {
+            center: new kakao.maps.LatLng(37.5006, 127.0364),
+            level: 5
+          });
+          mapEngine = 'kakao';
+          document.getElementById('kakao-setup-bar').className = "bg-emerald-600 text-white px-5 py-2 flex justify-between items-center z-40 shadow-sm";
+          document.getElementById('kakao-setup-bar').innerHTML = `
+            <div class="flex items-center space-x-2 text-xs font-bold">
+              <span class="bg-white text-emerald-800 px-2 py-0.5 rounded font-black">✅ KAKAO MAP 엔진 가동중</span>
+              <span>실제 카카오맵이 연결되었습니다! 이제 지도 우측 상단의 [📐 지적도 켜기]와 [📸 로드뷰]를 100% 실제 데이터로 사용할 수 있습니다.</span>
+            </div>
+          `;
+          renderMarkers();
+        });
+      };
+      script.onerror = () => {
+        alert('카카오맵 스크립트를 불러오지 못했습니다. JavaScript 키가 맞는지, 그리고 카카오 디벨로퍼스 [플랫폼 - Web]에 현재 도메인이 등록되어 있는지 확인해 주세요!');
+      };
+      document.head.appendChild(script);
+    }
+
+    // 📐 지적도(토지경계선) 토글 기능
+    function toggleCadastral() {
+      isCadastralOn = !isCadastralOn;
+      const btn = document.getElementById('btn-cadastral');
+
+      if (mapEngine === 'kakao' && kakaoMap) {
+        if (isCadastralOn) {
+          kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
+          btn.className = "bg-amber-400 text-slate-950 px-3.5 py-2 rounded-xl shadow-lg border border-amber-600 text-xs font-black flex items-center space-x-1.5 transition";
+          btn.innerHTML = "<span>📐 지적도(토지경계) 켜짐 ✓</span>";
+        } else {
+          kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
+          btn.className = "bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-lg border border-slate-300 text-xs font-black text-slate-800 hover:bg-amber-50 flex items-center space-x-1.5 transition";
+          btn.innerHTML = "<span>📐 지적도(토지경계선) 켜기</span>";
+        }
+      } else {
+        alert('💡 지적도(토지경계선) 레이어는 상단 노란색 바에 [카카오 JavaScript 키]를 입력해 카카오맵 엔진을 켜면 코드 1줄(`kakao.maps.MapTypeId.USE_DISTRICT`)로 즉시 지도에 입혀집니다!');
+      }
+    }
+
+    // 📸 상가 1층 외관 로드뷰 열기
+    function openRoadview() {
+      const item = listings.find(x => x.id === selectedId);
+      if (!item) return;
+
+      if (mapEngine === 'kakao' && window.kakao) {
+        document.getElementById('roadview-Wrap').classList.remove('hidden');
+        document.getElementById('rv-title').innerText = `${item.title} (${item.location})`;
+        const rvContainer = document.getElementById('roadview');
+        const rv = new kakao.maps.Roadview(rvContainer);
+        const rvClient = new kakao.maps.RoadviewClient();
+        const position = new kakao.maps.LatLng(item.lat, item.lng);
+
+        rvClient.getNearestPanoId(position, 50, function(panoId) {
+          if (panoId) {
+            rv.setPanoId(panoId, position);
+          } else {
+            alert('해당 좌표 반경 50m 내에 로드뷰 도로 데이터가 없습니다.');
+            closeRoadview();
+          }
+        });
+      } else {
+        // 키 입력 전에도 카카오맵 해당 좌표 로드뷰를 새 창이나 안내로 즉시 확인 가능하도록 제공
+        const goKakao = confirm(`[${item.title}]\n\n상단에 카카오 API 키를 넣으시면 이 화면 안에서 로드뷰가 바로 열립니다.\n지금 바로 카카오맵 실제 위치 화면으로 이동해서 이 상가 외관을 보시겠습니까?`);
+        if (goKakao) {
+          window.open(`https://map.kakao.com/link/roadview/${item.lat},${item.lng}`, '_blank');
+        }
+      }
+    }
+
+    function closeRoadview() {
+      document.getElementById('roadview-Wrap').classList.add('hidden');
+    }
+
+    // 🔍 실제 카카오 우편번호/도로명 주소 검색기 실행 (키 없이 100% 작동!)
+    function execKakaoPostcode() {
+      new daum.Postcode({
+        oncomplete: function(data) {
+          const fullAddr = data.roadAddress || data.jibunAddress;
+          document.getElementById('reg-address').value = fullAddr;
+          if (!document.getElementById('reg-title').value) {
+            document.getElementById('reg-title').value = `${data.sigungu} ${data.bname} 수익형 매물`;
+          }
+        }
+      }).open();
+    }
+
+    // 숫자 포맷팅 및 반블라인드 가격 변환
+    function formatPriceMan(man) {
+      const eok = Math.floor(man / 10000);
+      const rest = man % 10000;
+      if (eok > 0 && rest > 0) return `${eok}억 ${rest.toLocaleString()}만 원`;
+      if (eok > 0) return `${eok}억 원`;
+      return `${man.toLocaleString()}만 원`;
+    }
+
+    function formatBlindPrice(man) {
+      const eok = Math.floor(man / 10000);
+      const rest = man % 10000;
+      let range = '초반대';
+      if (rest >= 7000) range = '후반대';
+      else if (rest >= 3500) range = '중반대';
+      return `🔒 ${eok}억 ${range} 제안`;
+    }
+
+    // 지도 마커 렌더링 (Leaflet & KakaoMap 완벽 호환)
+    function renderMarkers() {
+      const filtered = listings.filter(item => {
+        if (item.mode !== currentMarketMode) return false;
+        if (currentCategory !== 'all' && item.category !== currentCategory) return false;
+        return true;
+      });
+
+      if (mapEngine === 'leaflet' && leafletMap) {
+        leafletMarkers.forEach(m => leafletMap.removeLayer(m));
+        leafletMarkers = [];
+
+        filtered.forEach(item => {
+          const isReverse = item.mode === 'reverse';
+          const bgColor = isReverse ? 'bg-amber-500' : (item.category === 'commercial' ? 'bg-blue-600' : 'bg-emerald-600');
+          const subBadge = isReverse ? `대기오퍼 ${item.offers.length}건` : (item.category === 'commercial' ? `수익률 ${item.yieldRate}%` : `오퍼 ${item.offers.length}건`);
+          const priceLabel = (item.priceMan / 10000).toFixed(1).replace('.0', '') + '억';
+
+          const html = `
+            <div class="custom-pin ${bgColor} text-white px-3 py-1.5 rounded-2xl shadow-xl border-2 border-white whitespace-nowrap">
+              <div class="text-[10px] font-bold opacity-95">${item.location.substring(0, 12)}</div>
+              <div class="font-black text-xs flex items-center space-x-1">
+                <span>${isReverse ? '희망 ≤' : '시작'} ${priceLabel}</span>
+                <span class="bg-slate-950/90 text-amber-300 px-1.5 py-0.5 rounded text-[10px]">${subBadge}</span>
+              </div>
+            </div>
+          `;
+          const icon = L.divIcon({ className: '', html, iconSize: [145, 48], iconAnchor: [72, 24] });
+          const marker = L.marker([item.lat, item.lng], { icon }).addTo(leafletMap);
+          marker.on('click', () => {
+            selectListing(item.id);
+            leafletMap.flyTo([item.lat, item.lng], 14, { duration: 0.6 });
+          });
+          leafletMarkers.push(marker);
+        });
+      } else if (mapEngine === 'kakao' && kakaoMap) {
+        kakaoOverlays.forEach(o => o.setMap(null));
+        kakaoOverlays = [];
+
+        filtered.forEach(item => {
+          const isReverse = item.mode === 'reverse';
+          const bgColor = isReverse ? 'bg-amber-500' : (item.category === 'commercial' ? 'bg-blue-600' : 'bg-emerald-600');
+          const subBadge = isReverse ? `대기오퍼 ${item.offers.length}건` : (item.category === 'commercial' ? `수익률 ${item.yieldRate}%` : `오퍼 ${item.offers.length}건`);
+          const priceLabel = (item.priceMan / 10000).toFixed(1).replace('.0', '') + '억';
+
+          const content = document.createElement('div');
+          content.className = `custom-pin ${bgColor} text-white px-3 py-1.5 rounded-2xl shadow-xl border-2 border-white whitespace-nowrap`;
+          content.innerHTML = `
+            <div class="text-[10px] font-bold opacity-95">${item.location.substring(0, 12)}</div>
+            <div class="font-black text-xs flex items-center space-x-1">
+              <span>${isReverse ? '희망 ≤' : '시작'} ${priceLabel}</span>
+              <span class="bg-slate-950/90 text-amber-300 px-1.5 py-0.5 rounded text-[10px]">${subBadge}</span>
+            </div>
+          `;
+          content.onclick = () => {
+            selectListing(item.id);
+            kakaoMap.panTo(new kakao.maps.LatLng(item.lat, item.lng));
+          };
+
+          const overlay = new kakao.maps.CustomOverlay({
+            position: new kakao.maps.LatLng(item.lat, item.lng),
+            content: content,
+            yAnchor: 1
+          });
+          overlay.setMap(kakaoMap);
+          kakaoOverlays.push(overlay);
+        });
+      }
+
+      if (filtered.length > 0 && !filtered.find(x => x.id === selectedId)) {
+        selectListing(filtered[0].id);
+      } else if (filtered.length > 0) {
+        selectListing(selectedId);
+      }
+    }
+
+    // 우측 상세 패널 업데이트
+    function selectListing(id) {
+      selectedId = id;
+      const item = listings.find(x => x.id === id);
+      if (!item) return;
+
+      document.getElementById('detail-badge').innerText = item.badge;
+      document.getElementById('detail-Location').innerText = item.location;
+      document.getElementById('detail-title').innerText = item.title;
+      document.getElementById('stat-val-1').innerText = formatPriceMan(item.priceMan);
+      document.getElementById('stat-val-2').innerText = item.rentMan > 0 ? `${item.depositMan.toLocaleString()}만 / ${item.rentMan.toLocaleString()}만` : `보증금 ${(item.depositMan/10000).toFixed(1)}억`;
+      document.getElementById('stat-val-3').innerText = item.yieldRate > 0 ? `${item.yieldRate}%` : '실거주/시세차익';
+
+      renderOffers(item);
+    }
+
+    // 반블라인드 & 듀얼트랙 오퍼 렌더링
+    function renderOffers(item) {
+      const container = document.getElementById('bid-list-container');
+      document.getElementById('bid-count-badge').innerText = `총 ${item.offers.length}건 경쟁중`;
+      container.innerHTML = '';
+
+      item.offers.forEach((offer, idx) => {
+        const isDirect = offer.track === 'direct';
+        const badgeClass = isDirect ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white';
+        const cardBorder = isDirect ? 'border-blue-200 bg-blue-50/40' : 'border-purple-200 bg-purple-50/40';
+        const trackTitle = isDirect ? '트랙A · 일반 매수자 (직거래)' : '트랙B · 파트너 공인중개사';
+
+        const displayedPrice = currentRole === 'owner' ? formatPriceMan(offer.priceMan) : formatBlindPrice(offer.priceMan);
+        const actionBtn = currentRole === 'owner'
+          ? `<button onclick="openAcceptModal('${item.id}', ${idx})" class="bg-slate-900 text-white text-xs font-extrabold px-3 py-1.5 rounded-xl hover:bg-blue-600 transition shadow-sm shrink-0">채택하기</button>`
+          : `<span class="text-[11px] font-bold text-slate-400 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shrink-0">집주인 열람전용</span>`;
+
+        container.innerHTML += `
+          <div class="p-3.5 rounded-2xl border ${cardBorder} flex justify-between items-center shadow-sm">
+            <div class="pr-3">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="text-[10px] font-extrabold ${badgeClass} px-2 py-0.5 rounded-md">${trackTitle}</span>
+                <span class="font-black text-slate-900 text-sm">${displayedPrice}</span>
+                <span class="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">${offer.subOpt}</span>
+              </div>
+              <p class="text-xs text-slate-600 mt-1.5 font-medium">조건: ${offer.cond}</p>
+            </div>
+            ${actionBtn}
+          </div>
+        `;
+      });
+    }
+
+    function toggleRole(role) {
+      currentRole = role;
+      const vBtn = document.getElementById('role-visitor');
+      const oBtn = document.getElementById('role-owner');
+      const banner = document.getElementById('role-explain-banner');
+
+      if (role === 'owner') {
+        oBtn.className = "px-2.5 py-1 rounded-lg font-extrabold bg-amber-400 text-slate-950 transition shadow";
+        vBtn.className = "px-2.5 py-1 rounded-lg font-medium text-slate-300 hover:text-white transition";
+        banner.className = "mb-4 p-3 rounded-xl bg-amber-50 border border-amber-300 text-slate-900 text-xs flex justify-between items-center";
+        banner.innerHTML = `<div><span class="font-black text-amber-800">🔑 집주인 본인 시점:</span><span class="ml-1 font-medium">모든 입찰자의 실제 호가와 중개보수 할인율이 공개되었습니다!</span></div>`;
+      } else {
+        vBtn.className = "px-2.5 py-1 rounded-lg font-bold bg-blue-600 text-white transition";
+        oBtn.className = "px-2.5 py-1 rounded-lg font-medium text-slate-300 hover:text-white transition";
+        banner.className = "mb-4 p-3 rounded-xl bg-slate-900 text-white text-xs flex justify-between items-center";
+        banner.innerHTML = `<div><span class="font-extrabold text-amber-400">👁️ 일반 방문자 시점:</span><span class="text-slate-200 ml-1">가격 담합 방지를 위해 입찰가는 구간으로만 표시됩니다.</span></div><button onclick="toggleRole('owner')" class="bg-amber-400 text-slate-950 font-black px-2.5 py-1 rounded-lg text-[11px]">집주인 시점 켜기</button>`;
+      }
+      selectListing(selectedId);
+    }
+
+    function switchMarketMode(mode) {
+      currentMarketMode = mode;
+      document.getElementById('mode-normal').className = mode === 'normal' ? "px-3.5 py-1.5 rounded-lg text-xs font-extrabold bg-white text-blue-600 shadow-sm transition" : "px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-600";
+      document.getElementById('mode-reverse').className = mode === 'reverse' ? "px-3.5 py-1.5 rounded-lg text-xs font-extrabold bg-amber-500 text-white shadow-sm transition" : "px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-600";
+      renderMarkers();
+    }
+
+    function filterCategory(cat) {
+      currentCategory = cat;
+      ['all', 'commercial', 'apartment', 'villa'].forEach(c => {
+        const btn = document.getElementById(`cat-${c}`);
+        btn.className = c === cat ? "px-3 py-1 rounded-full font-bold bg-slate-900 text-white" : "px-3 py-1 rounded-full font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200";
+      });
+      renderMarkers();
+    }
+
+    function selectTrack(track) {
+      currentTrack = track;
+      const dBtn = document.getElementById('track-btn-direct');
+      const aBtn = document.getElementById('track-btn-agent');
+      const subSelect = document.getElementById('input-sub-option');
+
+      if (track === 'direct') {
+        dBtn.className = "py-1.5 rounded-lg font-extrabold bg-white text-blue-600 shadow-sm transition";
+        aBtn.className = "py-1.5 rounded-lg font-bold text-slate-600 hover:text-slate-900 transition";
+        subSelect.innerHTML = `<option value="현금 잔금 1개월 내 (복비 0원)">현금 잔금 1개월 내 (복비 0원)</option><option value="포괄양수도 승계 희망">포괄양수도 승계 희망</option>`;
+      } else {
+        aBtn.className = "py-1.5 rounded-lg font-extrabold bg-white text-purple-600 shadow-sm transition";
+        dBtn.className = "py-1.5 rounded-lg font-bold text-slate-600 hover:text-slate-900 transition";
+        subSelect.innerHTML = `<option value="중개보수 0.3% (반값 인하)">중개보수 0.3% (반값 인하)</option><option value="매도인 복비 0원 (매수손님 전액부담)">매도인 복비 0원 (매수손님 전액부담)</option>`;
+      }
+    }
+
+    function submitOffer() {
+      const priceMan = parseInt(document.getElementById('input-price').value, 10);
+      const subOpt = document.getElementById('input-sub-option').value;
+      const cond = document.getElementById('input-condition').value.trim();
+      if (!priceMan || !cond) return alert('제안 금액과 상세 조건을 입력해 주세요!');
+
+      const item = listings.find(x => x.id === selectedId);
+      item.offers.unshift({ track: currentTrack, priceMan, subOpt, cond });
+      document.getElementById('input-price').value = '';
+      document.getElementById('input-condition').value = '';
+      selectListing(selectedId);
+      renderMarkers();
+    }
+
+    // 모달 제어 및 주소-좌표 변환 등록
+    function openRegisterModal() { document.getElementById('register-modal').classList.remove('hidden'); }
+    function closeRegisterModal() { document.getElementById('register-modal').classList.add('hidden'); }
+    function openGuideModal() { document.getElementById('guide-modal').classList.remove('hidden'); }
+    function closeGuideModal() { document.getElementById('guide-modal').classList.add('hidden'); }
+
+    function saveNewListing() {
+      const mode = document.getElementById('reg-mode').value;
+      const cat = document.getElementById('reg-cat').value;
+      const loc = document.getElementById('reg-address').value.trim() || '서울 성동구 성수동2가';
+      const title = document.getElementById('reg-title').value.trim() || '신규 등록 수익형 상가';
+      const priceMan = parseInt(document.getElementById('reg-price').value, 10) || 110000;
+      const depMan = parseInt(document.getElementById('reg-dep').value, 10) || 5000;
+      const rentMan = parseInt(document.getElementById('reg-rent').value, 10) || 420;
+      const yieldRate = rentMan > 0 ? parseFloat((((rentMan * 12) / (priceMan - depMan)) * 100).toFixed(2)) : 0;
+
+      // 카카오맵이 켜져 있으면 실제 주소를 위도/경도로 정확히 변환(Geocoding)
+      if (mapEngine === 'kakao' && window.kakao && kakao.maps.services) {
+        const geocoder = new kakao.maps.services.Geocoder();
+        geocoder.addressSearch(loc, function(result, status) {
+          let lat = 37.5445, lng = 127.0560;
+          if (status === kakao.maps.services.Status.OK) {
+            lat = parseFloat(result[0].y);
+            lng = parseFloat(result[0].x);
+          }
+          insertListingData(mode, cat, loc, title, priceMan, depMan, rentMan, yieldRate, lat, lng);
+        });
+      } else {
+        const lat = 37.5250 + (Math.random() - 0.5) * 0.04;
+        const lng = 127.0250 + (Math.random() - 0.5) * 0.04;
+        insertListingData(mode, cat, loc, title, priceMan, depMan, rentMan, yieldRate, lat, lng);
+      }
+    }
+
+    function insertListingData(mode, cat, loc, title, priceMan, depMan, rentMan, yieldRate, lat, lng) {
+      const newId = 'item_' + Date.now();
+      listings.unshift({
+        id: newId, mode, category: cat,
+        badge: mode === 'reverse' ? '🔥 매수 대기표 (역경매)' : '수익형 상가 · 신규 등록',
+        location: loc, title, lat, lng,
+        priceMan, depositMan: depMan, rentMan, yieldRate,
+        offers: []
+      });
+      closeRegisterModal();
+      switchMarketMode(mode);
+      selectListing(newId);
+      renderMarkers();
+    }
+
+    function openAcceptModal(itemId, idx) {
+      const item = listings.find(x => x.id === itemId);
+      const offer = item.offers[idx];
+      document.getElementById('accept-modal-title').innerText = `${formatPriceMan(offer.priceMan)} 제안자와 1:1 안심 매칭되었습니다!`;
+      document.getElementById('accept-track').innerText = offer.track === 'direct' ? '일반 매수자 (복비 0원 직거래)' : '파트너 공인중개사';
+      document.getElementById('accept-cond').innerText = `${offer.subOpt} / ${offer.cond}`;
+      document.getElementById('accept-modal').classList.remove('hidden');
+    }
+    function closeAcceptModal() { document.getElementById('accept-modal').classList.add('hidden'); }
+
+    function sortProperties(criterion) {
+      if (criterion === 'yield') listings.sort((a, b) => b.yieldRate - a.yieldRate);
+      else listings.sort((a, b) => b.offers.length - a.offers.length);
+      renderMarkers();
+    }
+
+    // 초기 실행
+    initLeaflet();
+    renderMarkers();
+    selectListing('item1');
+  </script>
+</body>
+</html>
+```
+</immersive>
